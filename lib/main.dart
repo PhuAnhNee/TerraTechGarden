@@ -1,29 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'cart_model.dart';
-import 'home_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'navigation/routes.dart';
+import 'navigation/app_router.dart';
+import 'pages/authentication/bloc/auth_bloc.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => CartModel(),
-      child: const TerraTechGardenApp(),
-    ),
-  );
+  runApp(MyApp());
 }
 
-class TerraTechGardenApp extends StatelessWidget {
-  const TerraTechGardenApp({super.key});
-
+class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'TerraTech Garden',
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+    return BlocProvider(
+      create: (context) => AuthBloc(),
+      child: MaterialApp(
+        title: 'Terrarium App',
+        initialRoute: Routes.login,
+        routes: getAppRoutes(),
       ),
-      home: const HomePage(),
     );
   }
 }

@@ -1,4 +1,4 @@
-package com.example.terratech_garden
+package com.example.terratechgarden
 
 import io.flutter.embedding.android.FlutterActivity
 

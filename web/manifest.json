@@ -1,6 +1,6 @@
 {
-    "name": "terratech_garden",
-    "short_name": "terratech_garden",
+    "name": "terratechgarden",
+    "short_name": "terratechgarden",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
