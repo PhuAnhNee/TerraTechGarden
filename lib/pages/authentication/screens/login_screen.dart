@@ -268,7 +268,7 @@ class LoginScreen extends StatelessWidget {
                             child: MaterialButton(
                               onPressed: () async {
                                 print('Google Login Button pressed');
-                                await _handleGoogleSignIn(context);
+                                // await _handleGoogleSignIn(context);
                               },
                               height: 50,
                               minWidth: double.infinity,
@@ -315,26 +315,19 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _handleGoogleSignIn(BuildContext context) async {
-    try {
-      final GoogleAuthProvider authProvider = GoogleAuthProvider();
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithProvider(authProvider);
-      // Use accessToken or idToken instead of token
-      final String accessToken = userCredential.credential?.accessToken ?? '';
-      if (accessToken.isEmpty) {
-        // Fallback to idToken if accessToken is not available
-        final String idToken = await userCredential.user?.getIdToken() ?? '';
-        await performGoogleLogin(context, idToken);
-      } else {
-        await performGoogleLogin(context, accessToken);
-      }
-    } catch (e) {
-      print('Firebase Google Sign-In Error: $e');
-      Message.showError(
-          context: context, message: 'Lỗi đăng nhập Google: ${e.toString()}');
-    }
-  }
+  // Future<void> _handleGoogleSignIn(BuildContext context) async {
+  //   try {
+  //     final GoogleAuthProvider authProvider = GoogleAuthProvider();
+  //     final UserCredential userCredential =
+  //         await FirebaseAuth.instance.signInWithProvider(authProvider);
+  //     final String accessToken = await userCredential.credential?.token ?? '';
+  //     await performGoogleLogin(context, accessToken);
+  //   } catch (e) {
+  //     print('Firebase Google Sign-In Error: $e');
+  //     Message.showError(
+  //         context: context, message: 'Lỗi đăng nhập Google: ${e.toString()}');
+  //   }
+  // }
 
   void _showSuccessNotification(BuildContext context) {
     OverlayEntry overlayEntry = OverlayEntry(
