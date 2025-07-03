@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
 import '../../../navigation/routes.dart';
 import '../../../components/message.dart';
@@ -7,6 +8,7 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import '../../../models/user.dart';
+import '../bloc/register_logic.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -41,30 +43,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      final user = User(
-        username: _usernameController.text.trim(),
-        passwordHash:
-            _passwordController.text.trim(), // Backend should handle hashing
-        email: _emailController.text.trim(),
-        phoneNumber: _phoneNumberController.text.trim(),
-        fullName: _fullNameController.text.trim(),
-        dateOfBirth: _dateOfBirthController.text.trim(),
-        gender: _selectedGender ?? '',
-      );
-      context.read<AuthBloc>().add(RegisterRequested(user: user));
-    }
-  }
-
   Future<void> _selectDate() async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate:
-          DateTime.now().subtract(const Duration(days: 6570)), // ~18 years ago
+      initialDate: DateTime.now().subtract(const Duration(days: 6570)),
       firstDate: DateTime(1900),
-      lastDate:
-          DateTime.now().subtract(const Duration(days: 4380)), // ~12 years ago
+      lastDate: DateTime.now().subtract(const Duration(days: 4380)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -75,8 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF4CAF50),
-              ),
+                  foregroundColor: const Color(0xFF4CAF50)),
             ),
           ),
           child: child!,
@@ -92,372 +75,500 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+        width: double.infinity,
+        decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, colors: [
+          Color(0xFF4CAF50), // Green shade 900
+          Color(0xFF66BB6A), // Green shade 800
+          Color(0xFF81C784) // Green shade 400
+        ])),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SizedBox(height: 80),
+            Padding(
+              padding: EdgeInsets.all(20),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 40.0),
-                    child: const Text(
-                      'Terrarium Haven',
-                      style: TextStyle(
-                        fontSize: 36.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(2.0, 2.0),
-                            blurRadius: 4.0,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Card(
-                    elevation: 8.0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16.0),
-                    ),
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'Đăng Ký',
-                              style: TextStyle(
-                                fontSize: 24.0,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF4CAF50),
-                                letterSpacing: 1.2,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  FadeInUp(
+                      duration: Duration(milliseconds: 1000),
+                      child: Text("TerraTechGarden",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                offset: Offset(2.0, 2.0),
+                                blurRadius: 4.0,
                               ),
-                            ),
-                            const SizedBox(height: 20.0),
-                            TextFormField(
-                              controller: _usernameController,
-                              decoration: _buildInputDecoration(
-                                label: 'Tên người dùng',
-                                icon: Icons.person,
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true) {
-                                  return 'Vui lòng nhập tên người dùng';
-                                }
-                                if (value!.length < 3) {
-                                  return 'Tên người dùng phải có ít nhất 3 ký tự';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextFormField(
-                              controller: _fullNameController,
-                              decoration: _buildInputDecoration(
-                                label: 'Họ và tên',
-                                icon: Icons.person_outline,
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true) {
-                                  return 'Vui lòng nhập họ và tên';
-                                }
-                                if (value!.trim().split(' ').length < 2) {
-                                  return 'Vui lòng nhập họ và tên đầy đủ';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextFormField(
-                              controller: _emailController,
-                              decoration: _buildInputDecoration(
-                                label: 'Email',
-                                icon: Icons.email,
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true)
-                                  return 'Vui lòng nhập email';
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                    .hasMatch(value!)) {
-                                  return 'Email không hợp lệ';
-                                }
-                                return null;
-                              },
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextFormField(
-                              controller: _phoneNumberController,
-                              decoration: _buildInputDecoration(
-                                label: 'Số điện thoại',
-                                icon: Icons.phone,
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true)
-                                  return 'Vui lòng nhập số điện thoại';
-                                // Vietnamese phone number validation
-                                if (!RegExp(r'^(0|\+84)[3-9]\d{8}$')
-                                    .hasMatch(value!)) {
-                                  return 'Số điện thoại không hợp lệ';
-                                }
-                                return null;
-                              },
-                              keyboardType: TextInputType.phone,
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextFormField(
-                              controller: _passwordController,
-                              decoration: _buildInputDecoration(
-                                label: 'Mật khẩu',
-                                icon: Icons.lock,
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility
-                                        : Icons.visibility_off,
-                                    color: const Color(0xFF4CAF50),
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true)
-                                  return 'Vui lòng nhập mật khẩu';
-                                if (value!.length < 8)
-                                  return 'Mật khẩu phải có ít nhất 8 ký tự';
-                                if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)')
-                                    .hasMatch(value)) {
-                                  return 'Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 số';
-                                }
-                                return null;
-                              },
-                              obscureText: _obscurePassword,
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextFormField(
-                              controller: _confirmPasswordController,
-                              decoration: _buildInputDecoration(
-                                label: 'Xác nhận mật khẩu',
-                                icon: Icons.lock_outline,
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureConfirmPassword
-                                        ? Icons.visibility
-                                        : Icons.visibility_off,
-                                    color: const Color(0xFF4CAF50),
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscureConfirmPassword =
-                                          !_obscureConfirmPassword;
-                                    });
-                                  },
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true)
-                                  return 'Vui lòng xác nhận mật khẩu';
-                                if (value != _passwordController.text) {
-                                  return 'Mật khẩu xác nhận không khớp';
-                                }
-                                return null;
-                              },
-                              obscureText: _obscureConfirmPassword,
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextFormField(
-                              controller: _dateOfBirthController,
-                              decoration: _buildInputDecoration(
-                                label: 'Ngày sinh',
-                                icon: Icons.calendar_today,
-                              ),
-                              validator: (value) {
-                                if (value?.isEmpty ?? true)
-                                  return 'Vui lòng chọn ngày sinh';
-                                try {
-                                  final date = DateFormat('yyyy-MM-dd')
-                                      .parseStrict(value!);
-                                  final now = DateTime.now();
-                                  final age = now.difference(date).inDays / 365;
-                                  if (age < 12)
-                                    return 'Phải từ 12 tuổi trở lên';
-                                  if (age > 120)
-                                    return 'Ngày sinh không hợp lệ';
-                                  return null;
-                                } catch (e) {
-                                  return 'Ngày sinh phải có định dạng YYYY-MM-DD';
-                                }
-                              },
-                              readOnly: true,
-                              onTap: _selectDate,
-                            ),
-                            const SizedBox(height: 16.0),
-                            DropdownButtonFormField<String>(
-                              value: _selectedGender,
-                              decoration: _buildInputDecoration(
-                                label: 'Giới tính',
-                                icon: Icons.people,
-                              ),
-                              items: ['Nam', 'Nữ', 'Khác'].map((String gender) {
-                                return DropdownMenuItem<String>(
-                                  value: gender,
-                                  child: Text(gender),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedGender = value;
-                                });
-                              },
-                              validator: (value) => value == null
-                                  ? 'Vui lòng chọn giới tính'
-                                  : null,
-                            ),
-                            const SizedBox(height: 24.0),
-                            BlocListener<AuthBloc, AuthState>(
-                              listener: (context, state) {
-                                if (state is AuthSuccess) {
-                                  Message.showSuccess(
-                                    context: context,
-                                    message: 'Đăng ký thành công',
-                                  );
-                                  Navigator.pushReplacementNamed(
-                                      context, Routes.home);
-                                } else if (state is AuthFailure) {
-                                  Message.showError(
-                                    context: context,
-                                    message: state.error,
-                                    onRetry: _submitForm,
-                                  );
-                                }
-                              },
-                              child: BlocBuilder<AuthBloc, AuthState>(
-                                builder: (context, state) {
-                                  return AnimatedOpacity(
-                                    opacity: state is AuthLoading ? 0.5 : 1.0,
-                                    duration: const Duration(milliseconds: 300),
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        onPressed: state is AuthLoading
-                                            ? null
-                                            : _submitForm,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF4CAF50),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 40.0, vertical: 16.0),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8.0),
-                                          ),
-                                          elevation: 4.0,
-                                        ),
-                                        child: state is AuthLoading
-                                            ? const SizedBox(
-                                                width: 24,
-                                                height: 24,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  color: Colors.white,
-                                                  strokeWidth: 2.0,
-                                                ),
-                                              )
-                                            : const Text(
-                                                'Đăng Ký',
-                                                style: TextStyle(
-                                                  fontSize: 16.0,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20.0),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, Routes.login);
-                    },
-                    child: const Text(
-                      'Đã có tài khoản? Đăng nhập',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.w500,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(1.0, 1.0),
-                            blurRadius: 2.0,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                            ],
+                          ))),
+                  SizedBox(height: 10),
+                  FadeInUp(
+                      duration: Duration(milliseconds: 1300),
+                      child: Text("Tạo tài khoản mới",
+                          style: TextStyle(color: Colors.white, fontSize: 18))),
                 ],
               ),
             ),
-          ),
+            SizedBox(height: 20),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30))),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(30),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: <Widget>[
+                        SizedBox(height: 30),
+
+                        // Username Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1400),
+                          child: _buildInputField(
+                            controller: _usernameController,
+                            hintText: "Tên người dùng",
+                            prefixIcon: Icons.person_outline,
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập tên người dùng';
+                              }
+                              if (value!.length < 3) {
+                                return 'Tên người dùng phải có ít nhất 3 ký tự';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Full Name Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1450),
+                          child: _buildInputField(
+                            controller: _fullNameController,
+                            hintText: "Họ và tên",
+                            prefixIcon: Icons.badge_outlined,
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập họ và tên';
+                              }
+                              if (value!.trim().split(' ').length < 2) {
+                                return 'Vui lòng nhập họ và tên đầy đủ';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Email Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1500),
+                          child: _buildInputField(
+                            controller: _emailController,
+                            hintText: "Email",
+                            prefixIcon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập email';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                  .hasMatch(value!)) {
+                                return 'Email không hợp lệ';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Phone Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1550),
+                          child: _buildInputField(
+                            controller: _phoneNumberController,
+                            hintText: "Số điện thoại",
+                            prefixIcon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập số điện thoại';
+                              }
+                              if (!RegExp(r'^(0|\+84)[3-9]\d{8}$')
+                                  .hasMatch(value!)) {
+                                return 'Số điện thoại không hợp lệ';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Password Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1600),
+                          child: _buildPasswordField(
+                            controller: _passwordController,
+                            hintText: "Mật khẩu",
+                            obscureText: _obscurePassword,
+                            onToggle: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập mật khẩu';
+                              }
+                              if (value!.length < 8) {
+                                return 'Mật khẩu phải có ít nhất 8 ký tự';
+                              }
+                              if (!RegExp(
+                                      r'^(?=.*[a-zÀ-Ỹà-ỹ])(?=.*[A-ZÀ-Ỹ])(?=.*\d)')
+                                  .hasMatch(value)) {
+                                return 'Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 số';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Confirm Password Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1650),
+                          child: _buildPasswordField(
+                            controller: _confirmPasswordController,
+                            hintText: "Xác nhận mật khẩu",
+                            obscureText: _obscureConfirmPassword,
+                            onToggle: () {
+                              setState(() {
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
+                              });
+                            },
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng xác nhận mật khẩu';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Mật khẩu xác nhận không khớp';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Date of Birth Field
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1700),
+                          child: _buildDateField(),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Gender Dropdown
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1750),
+                          child: _buildGenderDropdown(),
+                        ),
+                        SizedBox(height: 40),
+
+                        // Register Button
+                        BlocListener<AuthBloc, AuthState>(
+                          listener: (context, state) {
+                            if (state is AuthSuccess) {
+                              RegisterLogic.showOtpDialog(
+                                context,
+                                email: _emailController.text.trim(),
+                              );
+                            } else if (state is AuthFailure) {
+                              Message.showError(
+                                context: context,
+                                message: state.error,
+                                onRetry: () {
+                                  _submitForm();
+                                },
+                              );
+                            }
+                          },
+                          child: BlocBuilder<AuthBloc, AuthState>(
+                            builder: (context, state) {
+                              return FadeInUp(
+                                duration: Duration(milliseconds: 1800),
+                                child: AnimatedOpacity(
+                                  opacity: state is AuthLoading ? 0.5 : 1.0,
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 55,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Color(0xFF4CAF50),
+                                          Color(0xFF66BB6A)
+                                        ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(15),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(0xFF4CAF50)
+                                              .withOpacity(0.3),
+                                          spreadRadius: 1,
+                                          blurRadius: 8,
+                                          offset: Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: MaterialButton(
+                                      onPressed: state is AuthLoading
+                                          ? null
+                                          : _submitForm,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      child: state is AuthLoading
+                                          ? SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2.0,
+                                              ),
+                                            )
+                                          : Text(
+                                              "Đăng Ký",
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 30),
+
+                        FadeInUp(
+                          duration: Duration(milliseconds: 1900),
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, Routes.login);
+                            },
+                            child: RichText(
+                              text: TextSpan(
+                                text: "Đã có tài khoản? ",
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 16),
+                                children: [
+                                  TextSpan(
+                                    text: "Đăng nhập",
+                                    style: TextStyle(
+                                      color: Color(0xFF4CAF50),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          ],
         ),
       ),
     );
   }
 
-  InputDecoration _buildInputDecoration({
-    required String label,
-    required IconData icon,
-    Widget? suffixIcon,
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData prefixIcon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: Colors.grey[600]),
-      prefixIcon: Icon(icon, color: const Color(0xFF4CAF50)),
-      suffixIcon: suffixIcon,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.0),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(prefixIcon, color: Colors.grey[400]),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        validator: validator,
+        keyboardType: keyboardType,
+        readOnly: readOnly,
+        onTap: onTap,
       ),
-      errorBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: Colors.redAccent, width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      filled: true,
-      fillColor: Colors.grey[50],
     );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hintText,
+    required bool obscureText,
+    required VoidCallback onToggle,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[400]),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscureText
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              color: Colors.grey[400],
+            ),
+            onPressed: onToggle,
+          ),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        validator: validator,
+      ),
+    );
+  }
+
+  Widget _buildDateField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: TextFormField(
+        controller: _dateOfBirthController,
+        decoration: InputDecoration(
+          hintText: "Ngày sinh (YYYY-MM-DD)",
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon:
+              Icon(Icons.calendar_today_outlined, color: Colors.grey[400]),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        validator: (value) {
+          if (value?.isEmpty ?? true) {
+            return 'Vui lòng chọn ngày sinh';
+          }
+          try {
+            final date = DateFormat('yyyy-MM-dd').parseStrict(value!);
+            final now = DateTime.now();
+            final age = now.difference(date).inDays / 365;
+            if (age < 12) {
+              return 'Phải từ 12 tuổi trở lên';
+            }
+            if (age > 120) {
+              return 'Ngày sinh không hợp lệ';
+            }
+            print('Validated dateOfBirth: $value');
+            return null;
+          } catch (e) {
+            return 'Ngày sinh phải có định dạng YYYY-MM-DD';
+          }
+        },
+        readOnly: true,
+        onTap: _selectDate,
+      ),
+    );
+  }
+
+  Widget _buildGenderDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedGender,
+        decoration: InputDecoration(
+          hintText: "Chọn giới tính",
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(Icons.person_pin_outlined, color: Colors.grey[400]),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        items: ['Nam', 'Nữ'].map((String gender) {
+          return DropdownMenuItem<String>(
+            value: gender,
+            child: Text(gender),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            _selectedGender = value;
+          });
+        },
+        validator: (value) => value == null ? 'Vui lòng chọn giới tính' : null,
+        dropdownColor: Colors.white,
+        icon: Icon(Icons.arrow_drop_down, color: Colors.grey[400]),
+      ),
+    );
+  }
+
+  void _submitForm() {
+    if (_formKey.currentState!.validate()) {
+      // Map Vietnamese gender to server-expected values
+      String serverGender = _selectedGender == 'Nam' ? 'male' : 'female';
+
+      // Convert dateOfBirth to ISO 8601 format
+      final dateOfBirth =
+          DateFormat('yyyy-MM-dd').parse(_dateOfBirthController.text.trim());
+      final isoDateOfBirth = dateOfBirth.toUtc().toIso8601String();
+
+      final user = User(
+        username: _usernameController.text.trim(),
+        passwordHash: _passwordController.text.trim(),
+        email: _emailController.text.trim(),
+        phoneNumber: _phoneNumberController.text.trim(),
+        fullName: _fullNameController.text.trim(),
+        dateOfBirth: isoDateOfBirth,
+        gender: serverGender,
+      );
+
+      print('Submitting user data: ${user.toJson()}'); // Debug log
+      context.read<AuthBloc>().add(RegisterRequested(user: user));
+    }
   }
 }

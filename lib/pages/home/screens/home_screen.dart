@@ -5,17 +5,19 @@ import '../../../navigation/routes.dart';
 import '../bloc/home_bloc.dart';
 import '../bloc/home_event.dart';
 import '../bloc/home_state.dart';
+import '../../../widgets/navbar.dart';
+import '../../../widgets/footer.dart';
 
 class HomeScreen extends StatelessWidget {
   final List<Map<String, dynamic>> categories = [
-    {'name': 'Cây Thủy Canh', 'icon': Icons.add},
-    {'name': 'Terrarium', 'icon': Icons.add},
-    {'name': 'Sứu Thị Thủy Tinh', 'icon': Icons.add},
-    {'name': 'Vườn Nha Aquagarden', 'icon': Icons.add},
-    {'name': 'Cây Không Khí - Air Plants', 'icon': Icons.add},
-    {'name': 'Cây Cảnh Văn Phòng', 'icon': Icons.add},
-    {'name': 'Decor Ban Công - Nhà Ở', 'icon': Icons.add},
-    {'name': 'Nghệ Thuật Tranh Cây', 'icon': Icons.add},
+    {'name': 'Cây Thủy Canh', 'icon': Icons.local_florist},
+    {'name': 'Terrarium', 'icon': Icons.terrain},
+    {'name': 'Sứu Thị Thủy Tinh', 'icon': Icons.local_drink},
+    {'name': 'Vườn Nha Aquagarden', 'icon': Icons.local_florist},
+    {'name': 'Cây Không Khí - Air Plants', 'icon': Icons.cloud},
+    {'name': 'Cây Cảnh Văn Phòng', 'icon': Icons.desk},
+    {'name': 'Decor Ban Công - Nhà Ở', 'icon': Icons.weekend},
+    {'name': 'Nghệ Thuật Tranh Cây', 'icon': Icons.brush},
   ];
 
   final List<Map<String, dynamic>> products = [
@@ -24,7 +26,7 @@ class HomeScreen extends StatelessWidget {
       'price': '500.000đ',
       'discount': null,
       'image':
-          'https://i.pinimg.com/736x/01/91/a3/0191a3a58258c086c39a948871890b17.jpg', // Replace with actual image URL or asset
+          'https://i.pinimg.com/736x/01/91/a3/0191a3a58258c086c39a948871890b17.jpg',
     },
     {
       'name': 'Terrarium 01 - OM',
@@ -49,168 +51,184 @@ class HomeScreen extends StatelessWidget {
     },
   ];
 
+  HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => HomeBloc()..add(LoadHomeEvent()),
       child: Scaffold(
-        appBar: AppBar(
-          title: Image.asset(
-            'lib/assets/icon/icon.png', // Replace with your logo asset
-            height: 40.0,
-          ),
-          backgroundColor: Color(0xFF4CAF50),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.shopping_cart, color: Colors.white),
-              onPressed: () {},
-            ),
-          ],
-        ),
-        body: BlocBuilder<HomeBloc, HomeState>(
-          builder: (context, state) {
-            if (state is HomeLoading) {
-              return Center(child: CircularProgressIndicator());
-            }
-            return SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Search Bar
-                  Container(
-                    color: Color(0xFF4CAF50),
-                    padding: EdgeInsets.all(8.0),
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Bạn có tìm gì?',
-                        prefixIcon: Icon(Icons.search, color: Colors.white),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+        drawer: const NavDrawer(),
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                floating: true,
+                pinned: false,
+                snap: true,
+                backgroundColor: const Color(0xFF1D7020),
+                leading: Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.menu, color: Colors.white),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ),
+                title: Image.asset(
+                  'lib/assets/icon/icon.png',
+                  height: 40.0,
+                  errorBuilder: (context, error, stackTrace) => const Text(
+                    'Terarium Shop',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  // Categories
-                  Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DANH MỤC SẢN PHẨM',
-                          style: TextStyle(
-                            fontSize: 18.0,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF4CAF50),
-                          ),
-                        ),
-                        SizedBox(height: 8.0),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          itemCount: categories.length,
-                          itemBuilder: (context, index) {
-                            return ListTile(
-                              title: Text(categories[index]['name']),
-                              trailing: Icon(categories[index]['icon']),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Products Grid
-                  Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.75,
-                        crossAxisSpacing: 8.0,
-                        mainAxisSpacing: 8.0,
-                      ),
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        return Card(
-                          elevation: 4.0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Image.network(
-                                  products[index]['image'],
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      products[index]['name'],
-                                      style: TextStyle(fontSize: 14.0),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    SizedBox(height: 4.0),
-                                    Text(
-                                      products[index]['price'],
-                                      style: TextStyle(
-                                        fontSize: 16.0,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                    if (products[index]['discount'] != null)
-                                      Text(
-                                        products[index]['discount'],
-                                        style: TextStyle(
-                                          fontSize: 12.0,
-                                          color: Colors.orange,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  // Logout Button
-                  Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        print('Logout button pressed'); // Debug
-                        Navigator.pushReplacementNamed(context, Routes.login);
-                        print('Navigated to login screen'); // Debug
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: EdgeInsets.symmetric(vertical: 12.0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                      ),
-                      child: Text(Strings.logout,
-                          style: TextStyle(color: Colors.white)),
-                    ),
+                ),
+                centerTitle: true,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart, color: Colors.white),
+                    onPressed: () {},
                   ),
                 ],
               ),
-            );
-          },
+              SliverToBoxAdapter(
+                child: BlocBuilder<HomeBloc, HomeState>(
+                  builder: (context, state) {
+                    if (state is HomeLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return Column(
+                      children: [
+                        Container(
+                          color: const Color(0xFF1D7020),
+                          padding: const EdgeInsets.all(8.0),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Bạn có tìm gì?',
+                              prefixIcon:
+                                  const Icon(Icons.search, color: Colors.white),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'DANH MỤC SẢN PHẨM',
+                                style: TextStyle(
+                                  fontSize: 18.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF4CAF50),
+                                ),
+                              ),
+                              const SizedBox(height: 8.0),
+                              ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: categories.length,
+                                itemBuilder: (context, index) {
+                                  return ListTile(
+                                    title: Text(categories[index]['name']),
+                                    trailing: Icon(categories[index]['icon']),
+                                    onTap: () {},
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.75,
+                              crossAxisSpacing: 8.0,
+                              mainAxisSpacing: 8.0,
+                            ),
+                            itemCount: products.length,
+                            itemBuilder: (context, index) {
+                              return Card(
+                                elevation: 4.0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8.0),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Image.network(
+                                        products[index]['image'],
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                const Icon(Icons.broken_image,
+                                                    size: 50),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            products[index]['name'],
+                                            style:
+                                                const TextStyle(fontSize: 14.0),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4.0),
+                                          Text(
+                                            products[index]['price'],
+                                            style: const TextStyle(
+                                              fontSize: 16.0,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                          if (products[index]['discount'] !=
+                                              null)
+                                            Text(
+                                              products[index]['discount'],
+                                              style: const TextStyle(
+                                                fontSize: 12.0,
+                                                color: Colors.orange,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: AppFooter(),
+              ),
+            ],
+          ),
         ),
       ),
     );
