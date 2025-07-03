@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "567249289781",
+    "project_id": "terratechgarden-sep490",
+    "storage_bucket": "terratechgarden-sep490.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:567249289781:android:43e8d962fcca8dac11e77c",
+        "android_client_info": {
+          "package_name": "com.example.terratechgarden"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4ScR7g9mmclVYF5AqFBW6iUJvgRVm2IY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

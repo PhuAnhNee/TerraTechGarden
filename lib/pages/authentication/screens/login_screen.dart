@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import '../../../navigation/routes.dart';
 import '../../../components/message.dart';
 import '../bloc/auth_bloc.dart';
@@ -29,9 +30,7 @@ class LoginScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            SizedBox(
-              height: 80,
-            ),
+            SizedBox(height: 80),
             Padding(
               padding: EdgeInsets.all(20),
               child: Column(
@@ -52,9 +51,7 @@ class LoginScreen extends StatelessWidget {
                               ),
                             ],
                           ))),
-                  SizedBox(
-                    height: 10,
-                  ),
+                  SizedBox(height: 10),
                   FadeInUp(
                       duration: Duration(milliseconds: 1300),
                       child: Text("Chào mừng bạn đến với TerraTechGarden",
@@ -76,9 +73,7 @@ class LoginScreen extends StatelessWidget {
                     key: _formKey,
                     child: Column(
                       children: <Widget>[
-                        SizedBox(
-                          height: 60,
-                        ),
+                        SizedBox(height: 60),
                         FadeInUp(
                             duration: Duration(milliseconds: 1400),
                             child: Container(
@@ -147,15 +142,12 @@ class LoginScreen extends StatelessWidget {
                                 ],
                               ),
                             )),
-                        SizedBox(
-                          height: 40,
-                        ),
+                        SizedBox(height: 40),
                         FadeInUp(
                             duration: Duration(milliseconds: 1500),
                             child: TextButton(
                                 onPressed: () {
-                                  print(
-                                      'Forgot Password TextButton pressed'); // Debug
+                                  print('Forgot Password TextButton pressed');
                                   showDialog(
                                     context: context,
                                     builder: (context) => ForgetPass(),
@@ -163,15 +155,12 @@ class LoginScreen extends StatelessWidget {
                                 },
                                 child: Text("Quên mật khẩu?",
                                     style: TextStyle(color: Colors.grey)))),
-                        SizedBox(
-                          height: 40,
-                        ),
+                        SizedBox(height: 40),
                         BlocListener<AuthBloc, AuthState>(
                           listener: (context, state) {
-                            print(
-                                'AuthBloc State in LoginScreen: $state'); // Debug
+                            print('AuthBloc State in LoginScreen: $state');
                             if (state is AuthSuccess) {
-                              print('Navigating to home screen'); // Debug
+                              print('Navigating to home screen');
                               _showSuccessNotification(context);
                               ScaffoldMessenger.of(context).clearSnackBars();
                               Navigator.pushReplacementNamed(
@@ -247,21 +236,18 @@ class LoginScreen extends StatelessWidget {
                             },
                           ),
                         ),
-                        SizedBox(
-                          height: 30,
-                        ),
+                        SizedBox(height: 30),
                         FadeInUp(
                             duration: Duration(milliseconds: 1700),
                             child: TextButton(
                                 onPressed: () {
-                                  print('Register TextButton pressed'); // Debug
+                                  print('Register TextButton pressed');
                                   try {
                                     Navigator.pushNamed(
                                         context, Routes.register);
-                                    print(
-                                        'Navigated to register screen'); // Debug
+                                    print('Navigated to register screen');
                                   } catch (e) {
-                                    print('Navigation error: $e'); // Debug
+                                    print('Navigation error: $e');
                                     Message.showError(
                                       context: context,
                                       message: 'Lỗi điều hướng: $e',
@@ -271,27 +257,18 @@ class LoginScreen extends StatelessWidget {
                                 child: Text("Chưa có tài khoản? Đăng ký",
                                     style: TextStyle(
                                         color: Colors.grey, fontSize: 16)))),
-                        SizedBox(
-                          height: 30,
-                        ),
+                        SizedBox(height: 30),
                         FadeInUp(
                             duration: Duration(milliseconds: 1800),
                             child: Text("Hoặc đăng nhập bằng",
                                 style: TextStyle(color: Colors.grey))),
-                        SizedBox(
-                          height: 30,
-                        ),
+                        SizedBox(height: 30),
                         FadeInUp(
                             duration: Duration(milliseconds: 1900),
                             child: MaterialButton(
                               onPressed: () async {
-                                print('Google Login Button pressed'); // Debug
-                                String accessToken =
-                                    '379507523199-ua4p0mub3916tak8u101p32uhgb84mta.apps.googleusercontent.com';
-
-                                await performGoogleLogin(context, accessToken);
-                                // Add navigation logic here if needed, e.g.:
-                                // if successful, navigate to home
+                                print('Google Login Button pressed');
+                                await _handleGoogleSignIn(context);
                               },
                               height: 50,
                               minWidth: double.infinity,
@@ -336,6 +313,27 @@ class LoginScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleGoogleSignIn(BuildContext context) async {
+    try {
+      final GoogleAuthProvider authProvider = GoogleAuthProvider();
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithProvider(authProvider);
+      // Use accessToken or idToken instead of token
+      final String accessToken = userCredential.credential?.accessToken ?? '';
+      if (accessToken.isEmpty) {
+        // Fallback to idToken if accessToken is not available
+        final String idToken = await userCredential.user?.getIdToken() ?? '';
+        await performGoogleLogin(context, idToken);
+      } else {
+        await performGoogleLogin(context, accessToken);
+      }
+    } catch (e) {
+      print('Firebase Google Sign-In Error: $e');
+      Message.showError(
+          context: context, message: 'Lỗi đăng nhập Google: ${e.toString()}');
+    }
   }
 
   void _showSuccessNotification(BuildContext context) {
