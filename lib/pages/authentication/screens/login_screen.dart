@@ -288,8 +288,6 @@ class LoginScreen extends StatelessWidget {
                                 print('Google Login Button pressed'); // Debug
                                 String accessToken =
                                     '379507523199-ua4p0mub3916tak8u101p32uhgb84mta.apps.googleusercontent.com';
-
-                                await performGoogleLogin(context, accessToken);
                                 // Add navigation logic here if needed, e.g.:
                                 // if successful, navigate to home
                               },
