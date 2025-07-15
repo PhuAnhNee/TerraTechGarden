@@ -73,6 +73,9 @@ class NavDrawer extends StatelessWidget {
           case 'Profile':
             Navigator.pushNamed(context, '/profile');
             break;
+          case 'Categories':
+            Navigator.pushNamed(context, '/categories');
+            break;
           default:
             Navigator.pop(context);
             break;

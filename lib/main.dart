@@ -23,9 +23,17 @@ class MyApp extends StatelessWidget {
     return BlocProvider(
       create: (context) => AuthBloc(),
       child: MaterialApp(
-        title: 'Terrarium App',
         initialRoute: Routes.login,
         routes: getAppRoutes(),
+        theme: ThemeData(
+          primaryColor: const Color(0xFF1D7020),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1D7020),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
       ),
     );
   }
