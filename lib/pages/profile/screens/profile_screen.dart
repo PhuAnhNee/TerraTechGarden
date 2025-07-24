@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:animate_do/animate_do.dart'; // For fade-in animation
+import 'package:animate_do/animate_do.dart';
 import '../bloc/profile_bloc.dart';
 import '../../../models/user.dart';
 import '../bloc/profile_state.dart';
@@ -42,9 +42,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _saveProfile() {
     if (_formKey.currentState!.validate()) {
       final user = User(
-        userId: 1, // TODO: Fetch actual userId from state or API
+        userId: 1,
         username: _usernameController.text,
-        passwordHash: '', // TODO: Handle password securely if needed
+        passwordHash: '',
         email: _emailController.text,
         phoneNumber: _phoneController.text,
         fullName: _nameController.text,
@@ -54,6 +54,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final bloc = context.read<ProfileBloc>();
       bloc.add(UpdateProfileEvent(user: user));
     }
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required String? Function(String?) validator,
+    TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: TextFormField(
+        controller: controller,
+        validator: validator,
+        keyboardType: keyboardType,
+        readOnly: readOnly,
+        onTap: onTap,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF2D3748),
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4CAF50), Color(0xFF45A049)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Colors.red, width: 1),
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        ),
+      ),
+    );
   }
 
   @override
@@ -69,193 +140,386 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _genderController.text = state.user.gender;
         } else if (state is ProfileError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(state.message)),
+                ],
+              ),
+              backgroundColor: Colors.red[600],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           );
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Profile'),
-          backgroundColor: Colors.green[900],
-          elevation: 0,
-        ),
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.green[800]!, Colors.green[900]!],
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 120,
+              floating: false,
+              pinned: true,
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF4CAF50),
+                        Color(0xFF45A049),
+                        Color(0xFF388E3C),
+                      ],
+                    ),
+                  ),
+                ),
+                title: const Text(
+                  'My Profile',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+                centerTitle: true,
+              ),
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
             ),
-          ),
-          child: BlocBuilder<ProfileBloc, ProfileState>(
-            builder: (context, state) {
-              if (state is ProfileLoading) {
-                return const Center(
-                    child: CircularProgressIndicator(color: Colors.white));
-              } else if (state is ProfileLoaded) {
-                return FadeIn(
-                  duration: const Duration(milliseconds: 600),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Card(
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+            SliverToBoxAdapter(
+              child: BlocBuilder<ProfileBloc, ProfileState>(
+                builder: (context, state) {
+                  if (state is ProfileLoading) {
+                    return Container(
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      child: const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF4CAF50),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Loading profile...',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      color: Colors.white.withOpacity(0.9),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Form(
-                          key: _formKey,
-                          child: ListView(
-                            children: [
-                              const Center(
-                                child: Text(
-                                  'Edit Your Profile',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
+                    );
+                  } else if (state is ProfileLoaded) {
+                    return FadeInUp(
+                      duration: const Duration(milliseconds: 600),
+                      child: Container(
+                        margin: const EdgeInsets.all(20),
+                        child: Card(
+                          elevation: 8,
+                          shadowColor: Colors.black.withOpacity(0.1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white,
+                                  Colors.grey[50]!,
+                                ],
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Form(
+                                key: _formKey,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Profile Avatar Section
+                                    Center(
+                                      child: Column(
+                                        children: [
+                                          Container(
+                                            width: 100,
+                                            height: 100,
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  Color(0xFF4CAF50),
+                                                  Color(0xFF45A049)
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.green
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 20,
+                                                  offset: const Offset(0, 10),
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Icon(
+                                              Icons.person,
+                                              size: 50,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Edit Your Profile',
+                                            style: TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Update your personal information',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 32),
+
+                                    // Form Fields
+                                    _buildTextField(
+                                      controller: _nameController,
+                                      label: 'Full Name',
+                                      icon: Icons.person_outline,
+                                      validator: (value) => value!.isEmpty
+                                          ? 'Please enter your full name'
+                                          : null,
+                                    ),
+
+                                    _buildTextField(
+                                      controller: _usernameController,
+                                      label: 'Username',
+                                      icon: Icons.alternate_email,
+                                      validator: (value) => value!.isEmpty
+                                          ? 'Please enter a username'
+                                          : null,
+                                    ),
+
+                                    _buildTextField(
+                                      controller: _emailController,
+                                      label: 'Email Address',
+                                      icon: Icons.email_outlined,
+                                      keyboardType: TextInputType.emailAddress,
+                                      validator: (value) =>
+                                          !value!.contains('@')
+                                              ? 'Please enter a valid email'
+                                              : null,
+                                    ),
+
+                                    _buildTextField(
+                                      controller: _phoneController,
+                                      label: 'Phone Number',
+                                      icon: Icons.phone_outlined,
+                                      keyboardType: TextInputType.phone,
+                                      validator: (value) => value!.isEmpty
+                                          ? 'Please enter your phone number'
+                                          : null,
+                                    ),
+
+                                    _buildTextField(
+                                      controller: _dobController,
+                                      label: 'Date of Birth',
+                                      icon: Icons.calendar_today_outlined,
+                                      readOnly: true,
+                                      onTap: () async {
+                                        final date = await showDatePicker(
+                                          context: context,
+                                          initialDate: DateTime.now(),
+                                          firstDate: DateTime(1900),
+                                          lastDate: DateTime.now(),
+                                          builder: (context, child) {
+                                            return Theme(
+                                              data: Theme.of(context).copyWith(
+                                                colorScheme:
+                                                    const ColorScheme.light(
+                                                  primary: Color(0xFF4CAF50),
+                                                ),
+                                              ),
+                                              child: child!,
+                                            );
+                                          },
+                                        );
+                                        if (date != null) {
+                                          _dobController.text =
+                                              "${date.day}/${date.month}/${date.year}";
+                                        }
+                                      },
+                                      validator: (value) => value!.isEmpty
+                                          ? 'Please select your date of birth'
+                                          : null,
+                                    ),
+
+                                    _buildTextField(
+                                      controller: _genderController,
+                                      label: 'Gender',
+                                      icon: Icons.people_outline,
+                                      validator: (value) => value!.isEmpty
+                                          ? 'Please enter your gender'
+                                          : null,
+                                    ),
+
+                                    const SizedBox(height: 32),
+
+                                    // Save Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 56,
+                                      child: ElevatedButton(
+                                        onPressed: _saveProfile,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                        child: Ink(
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF4CAF50),
+                                                Color(0xFF45A049),
+                                              ],
+                                              begin: Alignment.centerLeft,
+                                              end: Alignment.centerRight,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.green
+                                                    .withOpacity(0.3),
+                                                blurRadius: 12,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Container(
+                                            alignment: Alignment.center,
+                                            child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.save_outlined,
+                                                  color: Colors.white,
+                                                  size: 24,
+                                                ),
+                                                SizedBox(width: 12),
+                                                Text(
+                                                  'Save Changes',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                              TextFormField(
-                                controller: _nameController,
-                                decoration: InputDecoration(
-                                  labelText: 'Full Name',
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                validator: (value) => value!.isEmpty
-                                    ? 'Please enter your full name'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _usernameController,
-                                decoration: InputDecoration(
-                                  labelText: 'Username',
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                validator: (value) => value!.isEmpty
-                                    ? 'Please enter a username'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _emailController,
-                                decoration: InputDecoration(
-                                  labelText: 'Email',
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                validator: (value) => !value!.contains('@')
-                                    ? 'Please enter a valid email'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _phoneController,
-                                decoration: InputDecoration(
-                                  labelText: 'Phone',
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                validator: (value) => value!.isEmpty
-                                    ? 'Please enter your phone number'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _dobController,
-                                decoration: InputDecoration(
-                                  labelText: 'Date of Birth',
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                validator: (value) => value!.isEmpty
-                                    ? 'Please enter your date of birth'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _genderController,
-                                decoration: InputDecoration(
-                                  labelText: 'Gender',
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                validator: (value) => value!.isEmpty
-                                    ? 'Please enter your gender'
-                                    : null,
-                              ),
-                              const SizedBox(height: 24),
-                              ElevatedButton(
-                                onPressed: _saveProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green[700],
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 4,
-                                ),
-                                child: const Text(
-                                  'Save Changes',
-                                  style: TextStyle(
-                                      fontSize: 18, color: Colors.white),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
+                    );
+                  } else if (state is ProfileError) {
+                    return Container(
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.error_outline,
+                                size: 48,
+                                color: Colors.red[400],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Oops! Something went wrong',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              state.message,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return Container(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: const Center(
+                      child: Text(
+                        'Something went wrong',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              } else if (state is ProfileError) {
-                return Center(
-                  child: Text(
-                    state.message,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                );
-              }
-              return const Center(
-                child: Text(
-                  'Something went wrong',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
-              );
-            },
-          ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

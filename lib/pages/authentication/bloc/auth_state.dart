@@ -11,7 +11,14 @@ class AuthUnauthenticated extends AuthState {}
 
 class AuthLoading extends AuthState {}
 
-class AuthSuccess extends AuthState {}
+class AuthSuccess extends AuthState {
+  final String? role; // Added role field
+
+  const AuthSuccess({this.role});
+
+  @override
+  List<Object?> get props => [role];
+}
 
 class AuthFailure extends AuthState {
   final String error;

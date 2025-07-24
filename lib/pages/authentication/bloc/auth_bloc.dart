@@ -48,8 +48,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         _storedRefreshToken = responseBody['refreshToken'];
         print(
             'Login successful, token: $_storedToken, refreshToken: $_storedRefreshToken');
+
+        // Decode JWT to extract role
+        final payload = _decodeJwtPayload(_storedToken!);
+        final role = payload[
+                'http://schemas.microsoft.com/ws/2008/06/identity/claims/role']
+            as String?;
+
         _scheduleTokenRefresh(_storedToken!);
-        emit(AuthSuccess());
+        emit(AuthSuccess(role: role)); // Pass role to AuthSuccess
       } else {
         final errorMessage = _parseErrorResponse(response);
         print(
@@ -91,7 +98,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final exp = payload['exp'] as int? ?? 0;
     final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
     final refreshTime = expiryDate.subtract(Duration(minutes: 5));
-    final timeUntilRefresh = DateTime.now().difference(refreshTime).inSeconds;
+    final timeUntilRefresh = refreshTime.difference(DateTime.now()).inSeconds;
 
     if (timeUntilRefresh > 0) {
       _refreshTimer =
