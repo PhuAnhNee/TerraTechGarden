@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart'; // Import Firebase Core
 import 'navigation/routes.dart';
 import 'navigation/app_router.dart';
 import 'pages/authentication/bloc/auth_bloc.dart';
+import 'pages/terrarium/bloc/terrarium_bloc.dart'; // Import TerrariumBloc
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter is initialized
@@ -20,8 +21,11 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => AuthBloc(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (context) => AuthBloc()),
+        BlocProvider(create: (context) => TerrariumBloc()), // Add TerrariumBloc
+      ],
       child: MaterialApp(
         initialRoute: Routes.login,
         routes: getAppRoutes(),

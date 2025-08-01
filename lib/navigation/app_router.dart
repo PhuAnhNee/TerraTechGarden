@@ -31,7 +31,8 @@ Map<String, WidgetBuilder> getAppRoutes() {
         ),
     Routes.blog: (context) => BlogScreen(),
     Routes.accessory: (context) => AccessoryScreen(),
-    Routes.terrarium: (context) => TerrariumScreen(),
+    Routes.terrarium: (context) =>
+        TerrariumScreen(), // No local provider needed
     Routes.shipperHome: (context) => ShipperHomeScreen(),
     Routes.delivery: (context) => DeliveryScreen(),
   };

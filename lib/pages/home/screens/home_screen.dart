@@ -9,52 +9,214 @@ import '../../accessory/screens/accessory_screen.dart';
 import '../../terrarium/screens/terrarium_screen.dart';
 import '../../blog/screens/blog_screen.dart';
 import '../../../navigation/routes.dart';
+import '../../terrarium/bloc/terrarium_bloc.dart';
+import '../../terrarium/bloc/terrarium_event.dart';
+import '../../terrarium/bloc/terrarium_state.dart';
+
+class TerrariumCard extends StatelessWidget {
+  final Map<String, dynamic> terrarium;
+  final VoidCallback onTap;
+
+  const TerrariumCard({
+    super.key,
+    required this.terrarium,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = terrarium['terrariumImages']?.isNotEmpty == true
+        ? terrarium['terrariumImages'][0]['imageUrl']
+        : 'https://res.cloudinary.com/dia8sg8u7/image/upload/v1753397462/terrariums/22/22.webp';
+
+    final name = terrarium['terrariumName'] ?? 'No name';
+    final minPrice = terrarium['minPrice'] ?? 0;
+    final maxPrice = terrarium['maxPrice'] ?? 0;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(15)),
+                    child: Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: Text(
+                              'Image failed to load',
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  if ((terrarium['stock'] ?? 0) > 1000)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8D426),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Bán chạy',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$minPrice – $maxPrice đ',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1D7020),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _buildProductCard(Map<String, dynamic> terrarium) {
+  return TerrariumCard(
+    terrarium: terrarium,
+    onTap: () {
+      // Navigate to detail if needed
+    },
+  );
+}
+
+Widget buildTerrariumGrid(BuildContext context) {
+  return BlocBuilder<TerrariumBloc, TerrariumState>(
+    builder: (context, state) {
+      if (state is TerrariumLoading) {
+        return const Center(child: CircularProgressIndicator());
+      } else if (state is TerrariumLoaded) {
+        final items = state.terrariums.take(6).toList(); // Limit to 6 items
+        return Column(
+          children: [
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.8,
+                crossAxisSpacing: 15,
+                mainAxisSpacing: 15,
+              ),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                return _buildProductCard(items[index]);
+              },
+            ),
+            if (state.terrariums.length >
+                6) // Show "View More" only if more items exist
+              Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, Routes.terrarium);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1D7020),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                    ),
+                    child: const Text(
+                      'Xem thêm',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  )),
+          ],
+        );
+      } else if (state is TerrariumError) {
+        return Center(child: Text(state.message));
+      } else {
+        return const SizedBox.shrink();
+      }
+    },
+  );
+}
 
 class HomeScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> products = [
-    {
-      'name': 'Terrarium 01 - Enjoy The...',
-      'price': '500.000',
-      'image':
-          'https://i.pinimg.com/736x/01/91/a3/0191a3a58258c086c39a948871890b17.jpg',
-      'isNew': true,
-    },
-    {
-      'name': 'Terrarium 02 - Phía Trước...',
-      'price': '350.000',
-      'image':
-          'https://i.pinimg.com/736x/01/91/a3/0191a3a58258c086c39a948871890b17.jpg',
-      'isNew': false,
-    },
-    {
-      'name': 'Terrarium 03 - Bức Tranh...',
-      'price': '999.000',
-      'image':
-          'https://i.pinimg.com/736x/01/91/a3/0191a3a58258c086c39a948871890b17.jpg',
-      'isNew': true,
-    },
-  ];
-
   HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => HomeBloc()..add(LoadHomeEvent()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => HomeBloc()..add(LoadHomeEvent()),
+        ),
+        BlocProvider(
+          create: (context) => TerrariumBloc()..add(FetchTerrariums(page: 1)),
+        ),
+      ],
       child: Scaffold(
         drawer: const NavDrawer(),
         appBar: AppBar(
           backgroundColor: const Color(0xFF1D7020),
           iconTheme: const IconThemeData(color: Colors.white),
-          title: Image.asset(
-            'lib/assets/icon/icon.png',
-            height: 40.0,
-            errorBuilder: (context, error, stackTrace) => const Text(
-              'Terrarium Shop',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+          title: const Text(
+            'TerraTechGarden', // Replaced Image.asset with Text
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
           ),
           centerTitle: true,
@@ -72,7 +234,7 @@ class HomeScreen extends StatelessWidget {
               children: [
                 _buildHeroSection(context),
                 _buildCategorySection(context),
-                _buildProductSection(),
+                _buildProductSection(context),
                 _buildInstagramSection(),
                 _buildInfoSection(),
                 const AppFooter(),
@@ -121,7 +283,7 @@ class HomeScreen extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Image.network(
-              'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+              'https://i.pinimg.com/1200x/7f/ba/98/7fba98487f5c5e004c775a3badbd3b3e.jpg',
               height: 400,
               width: double.infinity,
               fit: BoxFit.cover,
@@ -162,7 +324,7 @@ class HomeScreen extends StatelessWidget {
         children: [
           _buildCategoryItem(
             context,
-            'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+            'https://i.pinimg.com/1200x/e7/8b/6a/e78b6aa48b4492fc4e02e2d517231497.jpg',
             'Blog tham khảo',
             400,
             () {
@@ -224,7 +386,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProductSection() {
+  Widget _buildProductSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
       child: Column(
@@ -239,107 +401,8 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.8,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-            ),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(products[index]);
-            },
-          ),
+          buildTerrariumGrid(context),
         ],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(Map<String, dynamic> product) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(15)),
-                    child: Image.network(
-                      product['image'],
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  if (product['isNew'] == true)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8D426),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'Bán chạy',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product['name'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${product['price']} đ',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1D7020),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -349,16 +412,6 @@ class HomeScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       child: Column(
         children: [
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1D7020),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
-            child: const Text('Xem thêm'),
-          ),
           const SizedBox(height: 30),
           const Text(
             'Theo dõi TerraTech\ntrên Instagram',
