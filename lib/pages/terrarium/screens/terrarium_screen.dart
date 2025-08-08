@@ -4,6 +4,7 @@ import '../bloc/terrarium_bloc.dart';
 import '../bloc/terrarium_event.dart';
 import '../bloc/terrarium_state.dart';
 import '../../../components/terrarium_cart.dart';
+import '../../../navigation/routes.dart';
 
 class TerrariumScreen extends StatefulWidget {
   const TerrariumScreen({super.key});
@@ -59,6 +60,28 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
           curve: Curves.easeInOut,
         );
       }
+    }
+  }
+
+  void _navigateToTerrariumDetail(Map<String, dynamic> terrarium) {
+    // Get terrarium ID from the terrarium data
+    final terrariumId = terrarium['terrariumId']?.toString() ??
+        terrarium['id']?.toString() ??
+        '';
+
+    if (terrariumId.isNotEmpty) {
+      Navigator.pushNamed(
+        context,
+        Routes.terrariumDetail,
+        arguments: terrariumId,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể mở chi tiết terrarium - thiếu ID'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -591,15 +614,7 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
                           tag: 'terrarium_${terrarium['terrariumId'] ?? index}',
                           child: TerrariumCard(
                             terrarium: terrarium,
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      'Chi tiết ${terrarium['terrariumName'] ?? 'Terrarium'}'),
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
-                            },
+                            onTap: () => _navigateToTerrariumDetail(terrarium),
                           ),
                         );
                       },

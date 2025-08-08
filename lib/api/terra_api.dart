@@ -16,6 +16,16 @@ class TerraApi {
     return response.data;
   }
 
+  static Future<Map<String, dynamic>> getAccessories({int page = 1}) async {
+    final response = await _dio.get(
+      _baseUrl('Accessory/get-all'),
+      queryParameters: {
+        'IncludeProperties': 'AccessoryImages',
+      },
+    );
+    return response.data;
+  }
+
   static String _withQueryParams(String path,
       {int? page,
       int? pageSize,
@@ -72,30 +82,36 @@ class TerraApi {
     return url;
   }
 
+  // Accessory
   static String getAllAccessories() => _baseUrl('Accessory/get-all');
   static String getAccessoryByName(String name) =>
       _baseUrl('Accessory/get-by-name/$name');
-  static String filterAccessories() => _baseUrl('Accessory/filter');
+  static String filterAccessories({int? page, int? pageSize, String? name}) =>
+      _withQueryParams('Accessory/filter',
+          page: page, pageSize: pageSize, name: name);
   static String getAccessoryById(String id) => _baseUrl('Accessory/get-$id');
   static String addAccessory() => _baseUrl('Accessory/add-accessory');
   static String updateAccessory(String id) =>
-      _baseUrl('Accessory/update-accessory-$id');
+      _baseUrl('Accessory/update-accessory/$id');
   static String deleteAccessory(String id) =>
-      _baseUrl('Accessory/delete-accessory-$id');
+      _baseUrl('Accessory/delete-accessory/$id');
 
-  static String getAllAccessoryImages() => _baseUrl('AccessoryImage');
+  // AccessoryImage
+  static String getAllAccessoryImages() => _baseUrl('AccessoryImage/get-all');
   static String getAccessoryImageById(String id) =>
-      _baseUrl('AccessoryImage/$id');
-  static String updateAccessoryImage(String id) =>
-      _baseUrl('AccessoryImage/$id');
-  static String deleteAccessoryImage(String id) =>
-      _baseUrl('AccessoryImage/$id');
+      _baseUrl('AccessoryImage/get-by/$id');
   static String getAccessoryImagesByAccessoryId(String accessoryId) =>
-      _baseUrl('AccessoryImage/accessoryId/$accessoryId');
-  static String uploadAccessoryImage() => _baseUrl('AccessoryImage/upload');
+      _baseUrl('AccessoryImage/get-accessoryId/$accessoryId');
+  static String addAccessoryImage() =>
+      _baseUrl('AccessoryImage/add-accessoryimage');
+  static String updateAccessoryImage(String id) =>
+      _baseUrl('AccessoryImage/update-accessoryimage/$id');
+  static String deleteAccessoryImage(String id) =>
+      _baseUrl('AccessoryImage/delete-accessoryimage/$id');
 
+  // Accounts
   static String createAccount() => _baseUrl('Accounts');
-  static String getAllAccounts() => _baseUrl('Accounts');
+  static String getAllAccounts() => _baseUrl('Accounts/get-all');
   static String getAccountsByRole(String role) =>
       _baseUrl('Accounts/role/$role');
   static String updateAccountStatus(String userId) =>
@@ -104,56 +120,103 @@ class TerraApi {
   static String updateAccount(String id) => _baseUrl('Accounts/$id');
   static String deleteAccount(String id) => _baseUrl('Accounts/$id');
 
+  // Address
   static String getAllAddresses() => _baseUrl('Address/get-all');
-  static String getAddressById(String id) => _baseUrl('Address/get-$id');
+  static String getAddressById(String id) => _baseUrl('Address/get/$id');
   static String getAddressByUserId(String userId) =>
-      _baseUrl('Address/get-by-user-id-$userId');
+      _baseUrl('Address/get-by-user-id/$userId');
   static String addAddress() => _baseUrl('Address/add-address');
   static String updateAddress(String id) =>
-      _baseUrl('Address/update-address-$id');
-  static String deleteAddress(String id) => _baseUrl('Address/$id');
+      _baseUrl('Address/update-address/$id');
+  static String deleteAddress(String id) =>
+      _baseUrl('Address/delete-address/$id');
 
+  // AI
+  static String autoGenerateAI() => _baseUrl('AI/auto-generate');
+
+  // Blog
   static String getAllBlogs() => _baseUrl('Blog/get-all');
-  static String getBlogById(String id) => _baseUrl('Blog/get-$id');
+  static String getBlogById(String id) => _baseUrl('Blog/get/$id');
   static String addBlog() => _baseUrl('Blog/add-blog');
-  static String updateBlog(String id) => _baseUrl('Blog/update-blog-$id');
-  static String deleteBlog(String id) => _baseUrl('Blog/delete-blog-$id');
+  static String updateBlog(String id) => _baseUrl('Blog/update-blog/$id');
+  static String deleteBlog(String id) => _baseUrl('Blog/delete-blog/$id');
 
+  // BlogCategory
   static String getAllBlogCategories() => _baseUrl('BlogCategory/get-all');
   static String getBlogCategoryById(String id) =>
       _baseUrl('BlogCategory/get-$id');
   static String addBlogCategory() => _baseUrl('BlogCategory/add-blogCategory');
   static String updateBlogCategory(String id) =>
-      _baseUrl('BlogCategory/update-blogCategory-$id');
+      _baseUrl('BlogCategory/update-blogCategory/$id');
   static String deleteBlogCategory(String id) =>
-      _baseUrl('BlogCategory/delete-blogCategory-$id');
+      _baseUrl('BlogCategory/delete-blogCategory/$id');
 
-  static String getCart() => _baseUrl('Cart');
-  static String deleteCart() => _baseUrl('Cart');
-  static String addMultipleCartItems() => _baseUrl('Cart/items/multiple');
-  static String updateCartItem(String cartItemId) =>
-      _baseUrl('Cart/items/$cartItemId');
-  static String deleteCartItem(String itemId) => _baseUrl('Cart/items/$itemId');
-  static String checkoutCart() => _baseUrl('Cart/checkout');
+  // Cart
+  static String getCart() => _baseUrl('Cart/get-all');
+  static String addMultipleCartItems() => _baseUrl('Cart/add-items/multiple');
+  static String updateCartItem(String itemId) =>
+      _baseUrl('Cart/update-cart-item/$itemId');
+  static String deleteCartItem(String itemId) =>
+      _baseUrl('Cart/delete-cart-item/$itemId');
+  static String deleteAllCartItems() => _baseUrl('Cart/delete-all-cart-items');
+  static String checkoutCart() => _baseUrl('Cart/checkout-cart');
 
-  static String getAllCategories() => _baseUrl('Category');
-  static String createCategory() => _baseUrl('Category');
-  static String getCategoryById(String id) => _baseUrl('Category/$id');
-  static String updateCategory(String id) => _baseUrl('Category/$id');
-  static String deleteCategory(String id) => _baseUrl('Category/$id');
+  // Category
+  static String getAllCategories() => _baseUrl('Category/get-all');
+  static String createCategory() => _baseUrl('Category/add-category');
+  static String getCategoryById(String id) => _baseUrl('Category/get/$id');
+  static String updateCategory(String id) =>
+      _baseUrl('Category/update-category/$id');
+  static String deleteCategory(String id) =>
+      _baseUrl('Category/delete-category/$id');
 
+  // Chat
+  static String getAvailableUsers() => _baseUrl('Chat/available-users');
+  static String createChat() => _baseUrl('Chat/create');
+  static String getMyChats() => _baseUrl('Chat/my-chats');
+  static String getChatMessages(String chatId) =>
+      _baseUrl('Chat/$chatId/messages');
+  static String sendMessage() => _baseUrl('Chat/send-message');
+  static String markChatAsRead(String chatId) =>
+      _baseUrl('Chat/$chatId/mark-read');
+  static String debugUserInfo() => _baseUrl('Chat/debug/user-info');
+
+  // Environment
   static String getAllEnvironments() => _baseUrl('Environment/get-all');
-  static String createEnvironment() => _baseUrl('Environment');
-  static String getEnvironmentById(String id) => _baseUrl('Environment/$id');
-  static String updateEnvironment(String id) => _baseUrl('Environment/$id');
-  static String deleteEnvironment(String id) => _baseUrl('Environment/$id');
+  static String createEnvironment() => _baseUrl('Environment/add-environment');
+  static String getEnvironmentById(String id) =>
+      _baseUrl('Environment/get/$id');
+  static String updateEnvironment(String id) =>
+      _baseUrl('Environment/update-environment/$id');
+  static String deleteEnvironment(String id) =>
+      _baseUrl('Environment/delete-environment/$id');
 
+  // Feedback
   static String createFeedback() => _baseUrl('Feedback');
+  static String getAllFeedback() => _baseUrl('Feedback');
   static String getFeedbackByOrderItemId(String orderItemId) =>
-      _baseUrl('Feedback/$orderItemId');
+      _baseUrl('Feedback/order/$orderItemId');
+  static String updateFeedback(String id) => _baseUrl('Feedback/$id');
+  static String deleteFeedback(String id) => _baseUrl('Feedback/$id');
 
+  // FeedbackImage
+  static String getAllFeedbackImages() => _baseUrl('FeedbackImage/get-all');
+  static String getFeedbackImageById(String id) =>
+      _baseUrl('FeedbackImage/get/$id');
+  static String getFeedbackImagesByFeedbackId(String feedbackId) =>
+      _baseUrl('FeedbackImage/get-by-feedbackId/$feedbackId');
+  static String addFeedbackImage() => _baseUrl('FeedbackImage/add-image');
+  static String updateFeedbackImage(String id) =>
+      _baseUrl('FeedbackImage/update-image/$id');
+  static String deleteFeedbackImage(String id) =>
+      _baseUrl('FeedbackImage/delete-image/$id');
+
+  // Firebase
   static String saveFcmToken() => _baseUrl('Firebase/save-fcmtoken');
+  static String deleteFcmToken(String userId, String fcmToken) =>
+      _baseUrl('Firebase/$userId/$fcmToken');
 
+  // Membership
   static String purchaseMembership() => _baseUrl('Membership/purchase');
   static String getAllMemberships() => _baseUrl('Membership/all');
   static String getMembershipById(String id) => _baseUrl('Membership/$id');
@@ -168,6 +231,7 @@ class TerraApi {
   static String isMembershipExpired(String id) =>
       _baseUrl('Membership/$id/is-expired');
 
+  // MembershipPackage
   static String getAllMembershipPackages() => _baseUrl('MembershipPackage');
   static String getMembershipPackageById(String id) =>
       _baseUrl('MembershipPackage/$id');
@@ -178,6 +242,7 @@ class TerraApi {
   static String createMembershipPackage() =>
       _baseUrl('MembershipPackage/create');
 
+  // Notification
   static String createNotification() => _baseUrl('Notification/create');
   static String getAllNotifications() => _baseUrl('Notification/get-all');
   static String getNotificationById(String id) =>
@@ -189,61 +254,82 @@ class TerraApi {
   static String deleteNotification(String id) =>
       _baseUrl('Notification/delete/$id');
 
+  // Order
   static String getAllOrders() => _baseUrl('Order');
   static String createOrder() => _baseUrl('Order');
   static String getOrderById(String id) => _baseUrl('Order/$id');
   static String deleteOrder(String id) => _baseUrl('Order/$id');
+  static String getOrdersByUserId(String userId) =>
+      _baseUrl('Order/getbyuserid/$userId');
   static String updateOrderStatus(String id) => _baseUrl('Order/$id/status');
   static String checkoutOrder(String id) => _baseUrl('Order/$id/checkout');
+  static String getOrdersByUser(String userId) =>
+      _baseUrl('Order/user/$userId');
+  static String getOrderTransport(String id) => _baseUrl('Order/$id/Transport');
+  static String requestOrderRefund(String id) => _baseUrl('Order/$id/Refund');
+  static String updateOrderRefund(String id) => _baseUrl('Order/Refund/$id');
 
-  static String getAllOrderItems() => _baseUrl('OrderItem');
+  // OrderItem
+  static String getAllOrderItems() => _baseUrl('OrderItem/get-all');
   static String createOrderItem() => _baseUrl('OrderItem');
   static String getOrderItemById(String id) => _baseUrl('OrderItem/$id');
   static String updateOrderItem(String id) => _baseUrl('OrderItem/$id');
   static String deleteOrderItem(String id) => _baseUrl('OrderItem/$id');
   static String getOrderItemsByOrderId(String orderId) =>
-      _baseUrl('OrderItem/by-order/$orderId');
+      _baseUrl('OrderItem/get-by-order/$orderId');
 
+  // Payment
   static String payOsCallback() => _baseUrl('Payment/pay-os/callback');
   static String payOsPayment() => _baseUrl('Payment/pay-os');
   static String vnPayCallback() => _baseUrl('Payment/vn-pay/callback');
   static String vnPayPayment() => _baseUrl('Payment/vn-pay');
 
+  // Personalize
   static String getAllPersonalizations() => _baseUrl('Personalize/get-all');
   static String getPersonalizationById(String id) =>
       _baseUrl('Personalize/get-$id');
   static String addPersonalization() => _baseUrl('Personalize/add-personalize');
   static String updatePersonalization(String id) =>
-      _baseUrl('Personalize/update-$id');
+      _baseUrl('Personalize/update-personalize/$id');
   static String deletePersonalization(String id) =>
-      _baseUrl('Personalize/delete-$id');
+      _baseUrl('Personalize/delete-personalize/$id');
 
+  // Role
   static String getAllRoles() => _baseUrl('Role/get-all');
-  static String getRoleById(String id) => _baseUrl('Role/get-$id');
-  static String createRole() => _baseUrl('Role');
-  static String updateRole(String id) => _baseUrl('Role/$id');
-  static String deleteRole(String id) => _baseUrl('Role/$id');
+  static String getRoleById(String id) => _baseUrl('Role/get/$id');
+  static String createRole() =>
+      _baseUrl('Role/add-blog'); // Note: Possible typo in endpoint list
+  static String updateRole(String id) =>
+      _baseUrl('Role/update-blog/$id'); // Note: Possible typo in endpoint list
+  static String deleteRole(String id) =>
+      _baseUrl('Role/dalete-blog/$id'); // Note: Typo in endpoint list
 
+  // Shape
   static String getAllShapes() => _baseUrl('Shape/get-all');
   static String getShapeById(String id) => _baseUrl('Shape/get-$id');
   static String addShape() => _baseUrl('Shape/add-shape');
   static String updateShape(String id) => _baseUrl('Shape/update-shape-$id');
   static String deleteShape(String id) => _baseUrl('Shape/delete-shape-$id');
 
+  // TankMethod
   static String getAllTankMethods() => _baseUrl('TankMethod/get-all');
-  static String createTankMethod() => _baseUrl('TankMethod');
-  static String getTankMethodById(String id) => _baseUrl('TankMethod/$id');
-  static String updateTankMethod(String id) => _baseUrl('TankMethod/$id');
-  static String deleteTankMethod(String id) => _baseUrl('TankMethod/$id');
+  static String createTankMethod() => _baseUrl('TankMethod/add-tankmethod');
+  static String getTankMethodById(String id) => _baseUrl('TankMethod/get/$id');
+  static String updateTankMethod(String id) =>
+      _baseUrl('TankMethod/update-tankmethod/$id');
+  static String deleteTankMethod(String id) =>
+      _baseUrl('TankMethod/delete-tankmethod/$id');
 
+  // Terrarium
   static String getAllTerrariums() => _baseUrl('Terrarium/get-all');
-  static String filterTerrariums(
-          {int? environmentId,
-          int? shapeId,
-          int? tankMethodId,
-          int? page,
-          int? pageSize,
-          String? includeProperties}) =>
+  static String filterTerrariums({
+    int? environmentId,
+    int? shapeId,
+    int? tankMethodId,
+    int? page,
+    int? pageSize,
+    String? includeProperties,
+  }) =>
       _withQueryParams('Terrarium/filter',
           environmentId: environmentId,
           shapeId: shapeId,
@@ -262,30 +348,42 @@ class TerraApi {
   static String deleteTerrarium(String id) =>
       _baseUrl('Terrarium/delete-terrarium-$id');
 
+  // TerrariumImage
   static String getAllTerrariumImages() => _baseUrl('TerrariumImage/get-all');
   static String getTerrariumImageById(String id) =>
-      _baseUrl('TerrariumImage/get-$id');
+      _baseUrl('TerrariumImage/get/$id');
   static String getTerrariumImagesByTerrariumId(String terrariumId) =>
-      _baseUrl('TerrariumImage/terrariumId/$terrariumId');
+      _baseUrl('TerrariumImage/get-by-terrariumId/$terrariumId');
   static String uploadTerrariumImage() => _baseUrl('TerrariumImage/upload');
   static String updateTerrariumImage(String id) =>
-      _baseUrl('TerrariumImage/update-terrariumImage-$id');
+      _baseUrl('TerrariumImage/update-terrariumImage/$id');
   static String deleteTerrariumImage(String id) =>
-      _baseUrl('TerrariumImage/delete-terrariumImage-$id');
+      _baseUrl('TerrariumImage/delete-terrariumImage/$id');
 
+  // TerrariumVariant
   static String getAllTerrariumVariants() =>
       _baseUrl('TerrariumVariant/get-all-terrariumVariant');
   static String getTerrariumVariantById(String id) =>
-      _baseUrl('TerrariumVariant/get-terrariumVariant-$id');
+      _baseUrl('TerrariumVariant/get-terrariumVariant/$id');
   static String getVariantByTerrariumId(String id) =>
-      _baseUrl('TerrariumVariant/get-VariantByTerrarium-$id');
+      _baseUrl('TerrariumVariant/get-VariantByTerrarium/$id');
   static String createTerrariumVariant() =>
       _baseUrl('TerrariumVariant/create-terrariumVariant');
   static String updateTerrariumVariant(String id) =>
-      _baseUrl('TerrariumVariant/update-terrariumVariant-$id');
+      _baseUrl('TerrariumVariant/update-terrariumVariant/$id');
   static String deleteTerrariumVariant(String id) =>
-      _baseUrl('TerrariumVariant/delete-terrariumVariant-$id');
+      _baseUrl('TerrariumVariant/delete-terrariumVariant/$id');
 
+  // Transport
+  static String getTransport(String transportId) =>
+      _baseUrl('Transport/$transportId');
+  static String updateTransport(String transportId) =>
+      _baseUrl('Transport/$transportId');
+  static String deleteTransport(String transportId) =>
+      _baseUrl('Transport/$transportId');
+  static String createTransport() => _baseUrl('Transport');
+
+  // Users
   static String registerUser() => _baseUrl('Users/register');
   static String verifyOtp() => _baseUrl('Users/verify-otp');
   static String login() => _baseUrl('Users/login');
@@ -296,12 +394,15 @@ class TerraApi {
   static String getUserProfile() => _baseUrl('Users/profile');
   static String getAdminData() => _baseUrl('Users/admin-data');
   static String getManageData() => _baseUrl('Users/manage-data');
-  static String getStaffData() => _baseUrl('Users/staff-data');
 
+  // Voucher
   static String validateVoucher(String code) =>
       _baseUrl('Voucher/validate/$code');
-  static String getVoucherByCode(String code) => _baseUrl('Voucher/$code');
+  static String getVoucherByCode(String code) =>
+      _baseUrl('Voucher/get-by-code/$code');
   static String createVoucher() => _baseUrl('Voucher');
-  static String updateVoucher(String id) => _baseUrl('Voucher/$id');
-  static String deleteVoucher(String id) => _baseUrl('Voucher/$id');
+  static String updateVoucher(String id) =>
+      _baseUrl('Voucher/update-voucher/$id');
+  static String deleteVoucher(String id) =>
+      _baseUrl('Voucher/delete-voucher/$id');
 }

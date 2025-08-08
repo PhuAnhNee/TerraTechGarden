@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../navigation/routes.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/accessory_bloc.dart';
+import '../bloc/accessory_event.dart';
+import '../bloc/accessory_state.dart';
+import '../../../components/accessory_cart.dart';
+import 'dart:developer' as developer;
 
 class AccessoryScreen extends StatefulWidget {
   const AccessoryScreen({super.key});
@@ -9,137 +14,64 @@ class AccessoryScreen extends StatefulWidget {
 }
 
 class _AccessoryScreenState extends State<AccessoryScreen> {
-  final int itemsPerPage = 6;
   int currentPage = 1;
-  String _selectedFilter = 'All';
-
-  final List<Map<String, dynamic>> _allAccessories = List.generate(20, (index) {
-    return {
-      'name': 'Phụ kiện ${index + 1}',
-      'price': (index + 1) * 10000.0,
-      'image':
-          'https://bizweb.dktcdn.net/thumb/grande/100/351/129/products/snag-498c5f7.png',
-      'description':
-          'Mô tả chi tiết cho phụ kiện ${index + 1}. Đây là sản phẩm chất lượng cao cho terrarium.',
-      'isNew': index % 2 == 0, // Example: every other item is "new"
-    };
-  });
-
-  List<Map<String, dynamic>> _filteredAccessories = [];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _filteredAccessories =
-        List.from(_allAccessories); // Initialize with all accessories
+    context.read<AccessoryBloc>().add(FetchAccessories(page: currentPage));
   }
 
-  // Apply filter to accessories
-  void _applyFilter(String filter) {
-    setState(() {
-      _selectedFilter = filter;
-      if (filter == 'All') {
-        _filteredAccessories = List.from(_allAccessories);
-      } else if (filter == 'New') {
-        _filteredAccessories =
-            _allAccessories.where((a) => a['isNew'] == true).toList();
-      } else if (filter == 'Price: Low to High') {
-        _filteredAccessories = List.from(_allAccessories)
-          ..sort((a, b) => a['price'].compareTo(b['price']));
-      } else if (filter == 'Price: High to Low') {
-        _filteredAccessories = List.from(_allAccessories)
-          ..sort((a, b) => b['price'].compareTo(a['price']));
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _changePage(int newPage) {
+    if (newPage != currentPage) {
+      setState(() {
+        currentPage = newPage;
+      });
+      context.read<AccessoryBloc>().add(FetchAccessories(page: newPage));
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
-    });
+    }
   }
 
-  // Show modal bottom sheet with accessory details
-  void _showAccessoryDetails(
-      BuildContext context, Map<String, dynamic> accessory) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Image
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Image.network(
-                    accessory['image'],
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Name
-                Text(
-                  accessory['name'],
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1D7020),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Price
-                Text(
-                  '${accessory['price'].toStringAsFixed(0)} đ',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1D7020),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Description
-                Text(
-                  accessory['description'],
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Learn More Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, Routes.blog);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1D7020),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                    ),
-                    child: const Text(
-                      'Tìm hiểu thêm',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+  Widget _buildPaginationButton(int page, {bool isActive = false}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      child: Material(
+        elevation: isActive ? 4 : 1,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: isActive ? null : () => _changePage(page),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: isActive ? const Color(0xFF1D7020) : Colors.white,
+              border: Border.all(
+                color:
+                    isActive ? const Color(0xFF1D7020) : Colors.grey.shade300,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              '$page',
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.grey.shade700,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
             ),
           ),
         ),
@@ -147,97 +79,132 @@ class _AccessoryScreenState extends State<AccessoryScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    int start = (currentPage - 1) * itemsPerPage;
-    int end = (start + itemsPerPage).clamp(0, _filteredAccessories.length);
-    List<Map<String, dynamic>> currentItems =
-        _filteredAccessories.sublist(start, end);
-    int totalPages = (_filteredAccessories.length / itemsPerPage).ceil();
+  Widget _buildPaginationControls(int totalPages) {
+    if (totalPages <= 1) return const SizedBox();
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1D7020),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Phụ kiện chăm sóc',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+    List<Widget> paginationItems = [];
+    paginationItems.add(
+      Container(
+        margin: const EdgeInsets.only(right: 8),
+        child: Material(
+          elevation: 1,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: currentPage > 1 ? () => _changePage(currentPage - 1) : null,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Icon(
+                Icons.chevron_left,
+                color: currentPage > 1 ? const Color(0xFF1D7020) : Colors.grey,
+                size: 20,
+              ),
+            ),
           ),
         ),
-        centerTitle: true,
       ),
-      body: Column(
+    );
+
+    int startPage = 1;
+    int endPage = totalPages;
+
+    if (totalPages > 5) {
+      if (currentPage <= 3) {
+        endPage = 5;
+      } else if (currentPage >= totalPages - 2) {
+        startPage = totalPages - 4;
+      } else {
+        startPage = currentPage - 2;
+        endPage = currentPage + 2;
+      }
+    }
+
+    if (startPage > 1) {
+      paginationItems.add(_buildPaginationButton(1));
+      if (startPage > 2) {
+        paginationItems.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('...', style: TextStyle(color: Colors.grey)),
+          ),
+        );
+      }
+    }
+
+    for (int i = startPage; i <= endPage; i++) {
+      paginationItems
+          .add(_buildPaginationButton(i, isActive: i == currentPage));
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        paginationItems.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('...', style: TextStyle(color: Colors.grey)),
+          ),
+        );
+      }
+      paginationItems.add(_buildPaginationButton(totalPages));
+    }
+
+    paginationItems.add(
+      Container(
+        margin: const EdgeInsets.only(left: 8),
+        child: Material(
+          elevation: 1,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: currentPage < totalPages
+                ? () => _changePage(currentPage + 1)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Icon(
+                Icons.chevron_right,
+                color: currentPage < totalPages
+                    ? const Color(0xFF1D7020)
+                    : Colors.grey,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Column(
         children: [
-          // Filter Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('New'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Price: Low to High'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Price: High to Low'),
-                ],
-              ),
-            ),
-          ),
-          // Accessory Grid
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.8,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 15,
-                ),
-                itemCount: currentItems.length,
-                itemBuilder: (context, index) {
-                  return _buildAccessoryCard(context, currentItems[index]);
-                },
-              ),
-            ),
-          ),
-          // Pagination
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(totalPages, (index) {
-                int pageNum = index + 1;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        currentPage = pageNum;
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: currentPage == pageNum
-                          ? const Color(0xFF1D7020)
-                          : Colors.white,
-                      foregroundColor: currentPage == pageNum
-                          ? Colors.white
-                          : const Color(0xFF1D7020),
-                      side: const BorderSide(color: Color(0xFF1D7020)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      minimumSize: const Size(40, 40),
-                    ),
-                    child: Text('$pageNum'),
-                  ),
-                );
-              }),
+              children: paginationItems,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Trang $currentPage / $totalPages',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
             ),
           ),
         ],
@@ -245,111 +212,184 @@ class _AccessoryScreenState extends State<AccessoryScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label) {
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color:
-              _selectedFilter == label ? Colors.white : const Color(0xFF1D7020),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      selected: _selectedFilter == label,
-      selectedColor: const Color(0xFF1D7020),
-      backgroundColor: Colors.white,
-      side: const BorderSide(color: Color(0xFF1D7020)),
-      onSelected: (selected) {
-        if (selected) {
-          _applyFilter(label);
-        }
-      },
-    );
-  }
+  Widget _buildAccessoryCard(Map<String, dynamic> accessory) {
+    final imageUrl = accessory['accessoryImages'] != null &&
+            (accessory['accessoryImages'] as List).isNotEmpty
+        ? (accessory['accessoryImages'] as List).first['imageUrl'] ??
+            'https://via.placeholder.com/150'
+        : 'https://via.placeholder.com/150';
+    final name = accessory['accessoryName'] ?? 'Unnamed Accessory';
+    final price = accessory['price'] ?? 'N/A';
 
-  Widget _buildAccessoryCard(
-      BuildContext context, Map<String, dynamic> accessory) {
-    return GestureDetector(
-      onTap: () => _showAccessoryDetails(context, accessory),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(15)),
-                    child: Image.network(
-                      accessory['image'],
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(15)),
+                child: Image.network(
+                  imageUrl,
+                  height:
+                      constraints.maxHeight * 0.45, // 45% of available height
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    developer.log('Image load error for $name: $error',
+                        name: 'AccessoryScreen');
+                    return Container(
+                      height: constraints.maxHeight * 0.45,
                       width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  if (accessory['isNew'] == true)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8D426),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'Mới',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.error, color: Colors.red),
+                    );
+                  },
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Price: $price',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(), // Pushes button to bottom
+                      SizedBox(
+                        width: double.infinity,
+                        height: 36, // Fixed height for button
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1D7020),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 4, horizontal: 8),
+                            minimumSize: Size.zero,
+                          ),
+                          onPressed: () {
+                            // Placeholder button, no action
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.shopping_cart, size: 16),
+                              SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Thêm vào giỏ',
+                                  style: TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1D7020),
+        foregroundColor: Colors.white,
+        title: const Text('Phụ Kiện'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AccessoryCart(cartItems: []),
+                  ),
+                );
+              },
+              child: Row(
+                children: const [
+                  Icon(Icons.shopping_cart, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text('Giỏ hàng', style: TextStyle(color: Colors.white)),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    accessory['name'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+          ),
+        ],
+      ),
+      body: BlocConsumer<AccessoryBloc, AccessoryState>(
+        listener: (context, state) {},
+        builder: (context, state) {
+          if (state is AccessoryLoading) {
+            return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF1D7020)));
+          } else if (state is AccessoryLoaded) {
+            final accessories = state.accessories;
+
+            if (accessories.isEmpty) {
+              return const Center(
+                  child: Text('Không có phụ kiện nào',
+                      style: TextStyle(color: Color(0xFF1D7020))));
+            }
+
+            return Column(
+              children: [
+                Expanded(
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.75, // Adjusted aspect ratio
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    itemCount: accessories.length,
+                    itemBuilder: (context, index) {
+                      return _buildAccessoryCard(accessories[index]);
+                    },
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${accessory['price'].toStringAsFixed(0)} đ',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1D7020),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                ),
+                _buildPaginationControls(state.totalPages),
+              ],
+            );
+          } else if (state is AccessoryError) {
+            return Center(
+                child:
+                    Text(state.message, style: TextStyle(color: Colors.red)));
+          }
+          return const SizedBox.shrink();
+        },
       ),
     );
   }

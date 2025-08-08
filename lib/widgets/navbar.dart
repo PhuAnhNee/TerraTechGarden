@@ -33,6 +33,7 @@ class NavDrawer extends StatelessWidget {
                   _buildDrawerItem(Icons.category, 'Categories', context),
                   _buildDrawerItem(Icons.book, 'Blog', context),
                   _buildDrawerItem(Icons.person, 'Profile', context),
+                  _buildDrawerItem(Icons.shopping_cart, 'Cart', context),
                 ],
               ),
             ),
@@ -75,6 +76,9 @@ class NavDrawer extends StatelessWidget {
             break;
           case 'Categories':
             Navigator.pushNamed(context, '/categories');
+            break;
+          case 'Cart':
+            Navigator.pushNamed(context, '/cart');
             break;
           default:
             Navigator.pop(context);
