@@ -12,4 +12,5 @@ class Routes {
   static const String terrariumVariant = '/terrarium-variant';
   static const String terrariumDetail = '/terrarium-detail';
   static const String cart = '/cart';
+  static const String error = '/error';
 }

@@ -9,6 +9,7 @@ import 'pages/terrarium/bloc/terrarium_bloc.dart';
 import 'pages/accessory/bloc/accessory_bloc.dart';
 import 'pages/blog/bloc/blog_bloc.dart';
 import 'pages/cart/bloc/cart_bloc.dart';
+import 'pages/ship/home/bloc/ship_bloc.dart';
 
 Future<String?> getStoredToken() async {
   final prefs = await SharedPreferences.getInstance();
@@ -43,6 +44,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => AccessoryBloc()),
         BlocProvider(create: (context) => BlogBloc()),
         BlocProvider(create: (context) => CartBloc(storedToken: storedToken)),
+        BlocProvider(create: (context) => ShipBloc(storedToken)),
       ],
       child: MaterialApp(
         initialRoute: Routes.login,

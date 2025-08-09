@@ -12,12 +12,15 @@ import '../pages/blog/screens/blog_screen.dart';
 import '../pages/accessory/screens/accessory_screen.dart';
 import '../pages/terrarium/screens/terrarium_screen.dart';
 import '../pages/terrarium-detail/screens/terrarium_detail_screen.dart';
-import '../pages/ship/home/screens/shipperHome_screen.dart';
+import '../pages/ship/home/screens/shipper_home_screen.dart';
+import '../pages/ship/home/bloc/ship_bloc.dart';
+import '../pages/ship/home/bloc/ship_event.dart';
 import '../pages/ship/delivery/screens/delivery_screen.dart';
 import '../pages/cart/screens/cart_screen.dart';
 import '../pages/cart/bloc/cart_bloc.dart';
 import '../pages/cart/bloc/cart_event.dart';
 import 'routes.dart';
+import 'dart:developer' as developer;
 
 Map<String, WidgetBuilder> getAppRoutes() {
   return {
@@ -42,8 +45,8 @@ Map<String, WidgetBuilder> getAppRoutes() {
     Routes.terrariumDetail: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
-      print('TerrariumDetail CartBloc token: $token'); // Debug token
-
+      developer.log('TerrariumDetail CartBloc token: $token',
+          name: 'AppRouter');
       return BlocProvider(
         create: (context) => CartBloc(storedToken: token),
         child: TerrariumDetailScreen(
@@ -51,22 +54,32 @@ Map<String, WidgetBuilder> getAppRoutes() {
         ),
       );
     },
-    Routes.shipperHome: (context) => BlocProvider(
-          create: (context) =>
-              CartBloc(storedToken: context.read<AuthBloc>().token),
-          child: ShipperHomeScreen(),
-        ),
+    Routes.shipperHome: (context) {
+      final authBloc = context.read<AuthBloc>();
+      final token = authBloc.token;
+      developer.log('ShipperHome ShipBloc token: $token', name: 'AppRouter');
+      return BlocProvider(
+        create: (context) => ShipBloc(token)..add(FetchOrders()),
+        child: ShipperHomeScreen(token: token),
+      );
+    },
     Routes.delivery: (context) => DeliveryScreen(),
-    // Fixed: Added CartBloc provider for cart route
     Routes.cart: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
-      print('CartBloc token: $token'); // Debug token
-
+      developer.log('CartBloc token: $token', name: 'AppRouter');
       return BlocProvider(
         create: (context) => CartBloc(storedToken: token)..add(FetchCart()),
         child: CartScreen(),
       );
     },
+    Routes.error: (context) => const Scaffold(
+          body: Center(
+            child: Text(
+              'Failed to initialize app. Please try again later.',
+              style: TextStyle(color: Colors.red, fontSize: 18),
+            ),
+          ),
+        ),
   };
 }
