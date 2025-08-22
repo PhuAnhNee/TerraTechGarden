@@ -29,11 +29,8 @@ class NavDrawer extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   _buildDrawerItem(Icons.home, 'Home', context),
-                  _buildDrawerItem(Icons.store, 'Shop', context),
-                  _buildDrawerItem(Icons.category, 'Categories', context),
-                  _buildDrawerItem(Icons.book, 'Blog', context),
-                  _buildDrawerItem(Icons.person, 'Profile', context),
                   _buildDrawerItem(Icons.shopping_cart, 'Cart', context),
+                  // _buildDrawerItem(Icons.person, 'Profile', context),
                 ],
               ),
             ),

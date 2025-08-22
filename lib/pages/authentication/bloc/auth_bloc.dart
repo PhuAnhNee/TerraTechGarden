@@ -1,9 +1,12 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+// lib/pages/authentication/bloc/auth_bloc.dart
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../../config/config.dart';
-import '../../../models/user.dart';
+import '../../../core/utils/dio_config.dart';
+import '../../../api/terra_api.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -24,43 +27,65 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     return super.close();
   }
 
+  Future<void> saveFcmToken(String userId) async {
+    try {
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await Dio().post(
+          TerraApi.saveFcmToken(),
+          data: {
+            'userId': userId,
+            'fcmToken': fcmToken,
+          },
+        );
+        print('FCM token saved for user $userId');
+      }
+    } catch (e) {
+      print('Error saving FCM token: $e');
+    }
+  }
+
   Future<void> _onLoginRequested(
       LoginRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
       if (event.username.isEmpty || event.password.isEmpty) {
-        emit(AuthFailure(error: 'Vui lòng điền tên đăng nhập và mật khẩu'));
+        emit(const AuthFailure(
+            error: 'Vui lòng điền tên đăng nhập và mật khẩu'));
         return;
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/api/Users/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final response = await dioClient.dio.post(
+        '/api/Users/login',
+        data: {
           'username': event.username,
           'password': event.password,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
+        final responseBody = response.data;
         _storedToken = responseBody['token'];
         _storedRefreshToken = responseBody['refreshToken'];
+        AppConfig.accessToken = _storedToken; // Update AppConfig.accessToken
+        final userId = _decodeJwtPayload(_storedToken!)['sub'] as String?;
+        if (userId != null) {
+          await saveFcmToken(userId); // Save FCM token
+        }
         print(
             'Login successful, token: $_storedToken, refreshToken: $_storedRefreshToken');
 
-        // Decode JWT to extract role
         final payload = _decodeJwtPayload(_storedToken!);
         final role = payload[
                 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role']
             as String?;
 
         _scheduleTokenRefresh(_storedToken!);
-        emit(AuthSuccess(role: role)); // Pass role to AuthSuccess
+        emit(AuthSuccess(role: role));
       } else {
         final errorMessage = _parseErrorResponse(response);
         print(
-            'Login API Error: $errorMessage, Status: ${response.statusCode}, Body: ${response.body}');
+            'Login API Error: $errorMessage, Status: ${response.statusCode}, Body: ${response.data}');
         emit(AuthFailure(error: 'Đăng nhập thất bại: $errorMessage'));
       }
     } catch (e) {
@@ -72,19 +97,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       RegisterRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
+      dioClient.updateToken(null); // Clear Authorization header for register
       print('Register request body: ${jsonEncode(event.user.toJson())}');
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/api/Users/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(event.user.toJson()),
+      final response = await dioClient.dio.post(
+        '/api/Users/register',
+        data: event.user.toJson(),
       );
 
       if (response.statusCode == 200) {
-        emit(AuthSuccess());
+        emit(const AuthSuccess());
       } else {
         final errorMessage = _parseErrorResponse(response);
         print(
-            'Register API Error: $errorMessage, Status: ${response.statusCode}, Body: ${response.body}');
+            'Register API Error: $errorMessage, Status: ${response.statusCode}, Body: ${response.data}');
         emit(AuthFailure(error: 'Đăng ký thất bại: $errorMessage'));
       }
     } catch (e) {
@@ -97,7 +122,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final payload = _decodeJwtPayload(token);
     final exp = payload['exp'] as int? ?? 0;
     final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-    final refreshTime = expiryDate.subtract(Duration(minutes: 5));
+    final refreshTime = expiryDate.subtract(const Duration(minutes: 5));
     final timeUntilRefresh = refreshTime.difference(DateTime.now()).inSeconds;
 
     if (timeUntilRefresh > 0) {
@@ -110,28 +135,35 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (_storedRefreshToken == null) return;
 
     try {
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/api/Users/refresh-token'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refreshToken': _storedRefreshToken}),
+      dioClient.updateToken(null); // Clear Authorization header for refresh
+      final response = await dioClient.dio.post(
+        '/api/Users/refresh-token',
+        data: {'refreshToken': _storedRefreshToken},
       );
 
       if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
+        final responseBody = response.data;
         _storedToken = responseBody['token'];
+        _storedRefreshToken = responseBody['refreshToken'];
+        AppConfig.accessToken = _storedToken; // Update AppConfig.accessToken
+        dioClient.updateToken(_storedToken); // Update Dio with new token
         print('Token refreshed, new token: $_storedToken');
         _scheduleTokenRefresh(_storedToken!);
       } else {
         print('Token refresh failed: ${_parseErrorResponse(response)}');
-        emit(AuthFailure(error: 'Phiên hết hạn, vui lòng đăng nhập lại'));
+        emit(const AuthFailure(error: 'Phiên hết hạn, vui lòng đăng nhập lại'));
         _storedToken = null;
         _storedRefreshToken = null;
+        AppConfig.accessToken = null;
+        dioClient.updateToken(null);
       }
     } catch (e) {
       print('Token refresh error: $e');
-      emit(AuthFailure(error: 'Lỗi kết nối khi làm mới token'));
+      emit(const AuthFailure(error: 'Lỗi kết nối khi làm mới token'));
       _storedToken = null;
       _storedRefreshToken = null;
+      AppConfig.accessToken = null;
+      dioClient.updateToken(null);
     }
   }
 
@@ -143,12 +175,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     return jsonDecode(decoded);
   }
 
-  String _parseErrorResponse(http.Response response) {
+  String _parseErrorResponse(Response response) {
     try {
-      final body = jsonDecode(response.body);
-      return body['message'] ?? response.reasonPhrase ?? 'Lỗi không xác định';
+      final body = response.data;
+      return body['message'] ?? response.statusMessage ?? 'Lỗi không xác định';
     } catch (_) {
-      return response.reasonPhrase ?? 'Lỗi không xác định';
+      return response.statusMessage ?? 'Lỗi không xác định';
     }
   }
 

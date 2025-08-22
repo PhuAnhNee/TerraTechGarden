@@ -1,266 +1,427 @@
-import 'dart:developer' as developer;
-import 'package:bloc/bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http_parser/http_parser.dart';
 import '../../../../api/terra_api.dart';
+import '../../../../models/order.dart';
+import '../../../../models/transport.dart';
+import '../../../../models/address.dart';
 import 'ship_event.dart';
 import 'ship_state.dart';
+import 'dart:io';
 
 class ShipBloc extends Bloc<ShipEvent, ShipState> {
-  final String? _storedToken;
+  final Dio _dio = Dio();
 
-  ShipBloc(this._storedToken) : super(ShipInitial()) {
-    on<FetchOrders>(_onFetchOrders);
-    on<FetchOrderAddress>(_onFetchOrderAddress);
+  // Getter to access Dio instance from external widgets
+  Dio get dio => _dio;
+
+  ShipBloc() : super(ShipInitial()) {
+    on<LoadAvailableOrdersEvent>(_onLoadAvailableOrders);
+    on<LoadShippingOrdersEvent>(_onLoadShippingOrders);
+    on<LoadTransportsEvent>(_onLoadTransports);
+    on<CreateTransportEvent>(_onCreateTransport);
+    on<LoadAddressDetailsEvent>(_onLoadAddressDetails);
+    on<UpdateTransportStatusEvent>(_onUpdateTransportStatus);
+    on<LoadTransportByOrderEvent>(_onLoadTransportByOrder);
   }
 
-  Dio _getDio() {
-    final dio = Dio();
-    if (_storedToken != null) {
-      dio.options.headers['Authorization'] = 'Bearer $_storedToken';
-      developer.log('Authorization header set: Bearer $_storedToken',
-          name: 'ShipBloc');
-    } else {
-      developer.log('No token provided for Authorization', name: 'ShipBloc');
-    }
-    dio.options.headers['Content-Type'] = 'application/json';
-    dio.options.headers['Accept'] = '*/*';
-    return dio;
-  }
-
-  Future<void> _onFetchOrders(
-      FetchOrders event, Emitter<ShipState> emit) async {
+  Future<void> _onLoadAvailableOrders(
+      LoadAvailableOrdersEvent event, Emitter<ShipState> emit) async {
     emit(ShipLoading());
     try {
-      final dio = _getDio();
-      developer.log('Fetching orders from ${TerraApi.getAllOrders()}',
-          name: 'ShipBloc');
-      final response = await dio.get(TerraApi.getAllOrders());
-      developer.log(
-          'Orders API Response: ${response.statusCode} - ${response.data}',
-          name: 'ShipBloc');
+      // Get orders
+      final response = await _dio.get(
+        TerraApi.getAllOrders(),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
 
-      if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
-        if (responseData['status'] == 200) {
-          final List<dynamic> ordersData =
-              responseData['data'] as List<dynamic>? ?? [];
-          final filteredOrders = ordersData
-              .where((order) =>
-                  (order['paymentStatus'] as String?)?.toLowerCase() == 'paid')
-              .toList();
+      if (response.statusCode == 200 && response.data['status'] == 200) {
+        final ordersData = response.data['data'] as List;
 
-          // Transform orders and fetch address for each
-          List<Map<String, dynamic>> transformedOrders = [];
-          for (var order in filteredOrders) {
-            final transformedOrder =
-                await _transformOrderWithAddress(order, dio);
-            transformedOrders.add(transformedOrder);
-          }
+        // Filter orders: only processing status and paid payment status
+        final filteredOrders = ordersData
+            .map((orderJson) => Order.fromJson(orderJson))
+            .where((order) =>
+                order.status == 'processing' && order.paymentStatus == 'Paid')
+            .toList();
 
-          emit(ShipLoaded(transformedOrders));
-        } else {
-          emit(ShipError(
-              'Failed to fetch orders: ${responseData['message'] ?? 'Unknown error'}'));
-        }
-      } else {
-        emit(ShipError(
-            'Failed to fetch orders: Status ${response.statusCode} - ${response.data['message'] ?? 'Unknown error'}'));
-      }
-    } catch (e) {
-      developer.log('Error fetching orders: $e', name: 'ShipBloc');
-      if (e is DioException) {
-        developer.log('Dio error details: ${e.response?.data}',
-            name: 'ShipBloc');
-        if (e.response?.statusCode == 401) {
-          emit(ShipError(
-              'Unauthorized: Please log in again. Status ${e.response?.statusCode}'));
-        } else {
-          emit(ShipError(
-              'Failed to fetch orders: ${e.response?.data['message'] ?? e.message}'));
-        }
-      } else {
-        emit(ShipError('Failed to fetch orders: $e'));
-      }
-    }
-  }
-
-  Future<Map<String, dynamic>> _transformOrderWithAddress(
-      Map<String, dynamic> order, Dio dio) async {
-    final userId = order['userId'] as int?;
-
-    // Default values
-    String customerName = 'Unknown Customer';
-    String customerAddress = 'Unknown Address';
-    String receiverPhone = 'Unknown Phone';
-
-    if (userId != null) {
-      try {
-        // Fetch address from API
-        final addressUrl = TerraApi.getAddressByUserId(userId.toString());
-        developer.log('Fetching address for user $userId from $addressUrl',
-            name: 'ShipBloc');
-
-        final addressResponse = await dio.get(addressUrl);
-
-        if (addressResponse.statusCode == 200) {
-          final addressResponseData =
-              addressResponse.data as Map<String, dynamic>;
-          if (addressResponseData['status'] == 200) {
-            final List<dynamic> addressData =
-                addressResponseData['data'] as List<dynamic>? ?? [];
-
-            // Find default address
-            final defaultAddress = addressData.firstWhere(
-              (address) => address['isDefault'] == true,
-              orElse: () => addressData.isNotEmpty ? addressData.first : null,
+        // Load address details for each order
+        Map<int, Address> addresses = {};
+        for (final order in filteredOrders) {
+          try {
+            final addressResponse = await _dio.get(
+              TerraApi.getAddress(order.addressId),
+              options: Options(
+                headers: {
+                  'Authorization': 'Bearer ${event.token}',
+                  'accept': '*/*',
+                },
+              ),
             );
 
-            if (defaultAddress != null) {
-              customerName = defaultAddress['receiverName']?.toString() ??
-                  'Unknown Customer';
-              customerAddress = defaultAddress['receiverAddress']?.toString() ??
-                  'Unknown Address';
-              receiverPhone = defaultAddress['receiverPhone']?.toString() ??
-                  'Unknown Phone';
-
-              developer.log(
-                  'Address found for user $userId: $customerName, $customerAddress, $receiverPhone',
-                  name: 'ShipBloc');
-            } else {
-              developer.log('No address found for user $userId',
-                  name: 'ShipBloc');
+            if (addressResponse.statusCode == 200 &&
+                addressResponse.data['status'] == 200) {
+              addresses[order.addressId] =
+                  Address.fromJson(addressResponse.data['data']);
             }
+          } catch (e) {
+            print('Error loading address ${order.addressId}: $e');
           }
         }
-      } catch (e) {
-        developer.log('Error fetching address for user $userId: $e',
-            name: 'ShipBloc');
-        // Keep default values
+
+        emit(OrdersLoaded(orders: filteredOrders, addresses: addresses));
+      } else {
+        emit(ShipError(
+            'Failed to load orders: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to load orders: $e'));
       }
     }
-
-    return {
-      'orderId': order['orderId']?.toString() ?? 'Unknown Order',
-      'userId': userId ?? 0,
-      'customerName': customerName,
-      'customerAddress': customerAddress,
-      'receiverPhone': receiverPhone,
-      'location': const LatLng(10.7769,
-          106.7009), // Default location - you might want to parse from address
-      'status': _mapStatus(order['status']?.toString() ?? 'pending'),
-      'date': _formatDate(
-          order['orderDate']?.toString() ?? DateTime.now().toIso8601String()),
-      'paymentStatus': order['paymentStatus']?.toString() ?? 'unknown',
-      'totalAmount': order['totalAmount'] ?? 0,
-      'steps': {
-        'picked': order['status'] == 'picked' ||
-            order['status'] == 'delivering' ||
-            order['status'] == 'delivered',
-        'delivering':
-            order['status'] == 'delivering' || order['status'] == 'delivered',
-        'delivered': order['status'] == 'delivered',
-      },
-    };
   }
 
-  Future<void> _onFetchOrderAddress(
-      FetchOrderAddress event, Emitter<ShipState> emit) async {
+  Future<void> _onLoadShippingOrders(
+      LoadShippingOrdersEvent event, Emitter<ShipState> emit) async {
     emit(ShipLoading());
     try {
-      final dio = _getDio();
-      final apiUrl = TerraApi.getAddressByUserId(event.userId.toString());
-      developer.log('Fetching address from $apiUrl', name: 'ShipBloc');
-      final response = await dio.get(apiUrl);
-      developer.log(
-          'Address API Response: ${response.statusCode} - ${response.data}',
-          name: 'ShipBloc');
+      // Get orders with shipping status and paid payment status
+      final response = await _dio.get(
+        TerraApi.getAllOrders(),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
 
-      if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
-        if (responseData['status'] == 200) {
-          final List<dynamic> addressData =
-              responseData['data'] as List<dynamic>? ?? [];
-          final defaultAddress = addressData.firstWhere(
-            (address) => address['isDefault'] == true,
-            orElse: () => addressData.isNotEmpty ? addressData.first : null,
-          );
-          if (defaultAddress != null) {
-            emit(ShipAddressLoaded({
-              'receiverName':
-                  defaultAddress['receiverName']?.toString() ?? 'Unknown',
-              'receiverPhone':
-                  defaultAddress['receiverPhone']?.toString() ?? 'Unknown',
-              'receiverAddress':
-                  defaultAddress['receiverAddress']?.toString() ?? 'Unknown',
-              'userId': event.userId,
-            }));
-          } else {
-            emit(ShipError('No address found for user ${event.userId}'));
+      if (response.statusCode == 200 && response.data['status'] == 200) {
+        final ordersData = response.data['data'] as List;
+
+        // Filter orders: only shipping status and paid payment status
+        final filteredOrders = ordersData
+            .map((orderJson) => Order.fromJson(orderJson))
+            .where((order) =>
+                order.status == 'shipping' && order.paymentStatus == 'Paid')
+            .toList();
+
+        // Load address details for each order
+        Map<int, Address> addresses = {};
+        for (final order in filteredOrders) {
+          try {
+            final addressResponse = await _dio.get(
+              TerraApi.getAddress(order.addressId),
+              options: Options(
+                headers: {
+                  'Authorization': 'Bearer ${event.token}',
+                  'accept': '*/*',
+                },
+              ),
+            );
+
+            if (addressResponse.statusCode == 200 &&
+                addressResponse.data['status'] == 200) {
+              addresses[order.addressId] =
+                  Address.fromJson(addressResponse.data['data']);
+            }
+          } catch (e) {
+            print('Error loading address ${order.addressId}: $e');
           }
+        }
+
+        emit(OrdersLoaded(orders: filteredOrders, addresses: addresses));
+      } else {
+        emit(ShipError(
+            'Failed to load shipping orders: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
         } else {
-          emit(ShipError(
-              'Failed to fetch address: ${responseData['message'] ?? 'Unknown error'}'));
+          emit(ShipError('Network error: ${e.message}'));
         }
       } else {
-        emit(ShipError(
-            'Failed to fetch address: Status ${response.statusCode} - ${response.data['message'] ?? 'Unknown error'}'));
-      }
-    } catch (e) {
-      developer.log('Error fetching address: $e', name: 'ShipBloc');
-      if (e is DioException) {
-        developer.log('Dio error details: ${e.response?.data}',
-            name: 'ShipBloc');
-        emit(ShipError(
-            'Failed to fetch address: ${e.response?.data['message'] ?? e.message}'));
-      } else {
-        emit(ShipError('Failed to fetch address: $e'));
+        emit(ShipError('Failed to load shipping orders: $e'));
       }
     }
   }
 
-  String _mapStatus(String apiStatus) {
-    switch (apiStatus.toLowerCase()) {
-      case 'pending':
-        return 'available';
-      case 'picked':
-        return 'picked';
-      case 'delivering':
-        return 'delivering';
-      case 'delivered':
-        return 'delivered';
-      case 'cancelled':
-        return 'cancelled';
-      default:
-        return 'available';
-    }
-  }
-
-  String _formatDate(String date) {
+  Future<void> _onLoadTransports(
+      LoadTransportsEvent event, Emitter<ShipState> emit) async {
+    emit(ShipLoading());
     try {
-      final parsedDate = DateTime.parse(date);
-      return '${parsedDate.day} ${_getMonthName(parsedDate.month)} ${parsedDate.year % 100}';
+      final response = await _dio.get(
+        TerraApi.getAllTransports(),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        final transportsData = responseData['data'] as List? ?? [];
+        final transports = <Transport>[];
+        final Map<int, Address> addresses = {};
+
+        for (var transportJson in transportsData) {
+          final transport = Transport.fromJson(transportJson);
+          if (transport.status == 'inWarehouse' ||
+              transport.status == 'shipping') {
+            // Fetch order details to get addressId
+            final orderResponse = await _dio.get(
+              TerraApi.getOrder(transport.orderId),
+              options: Options(
+                headers: {
+                  'Authorization': 'Bearer ${event.token}',
+                  'accept': '*/*',
+                },
+              ),
+            );
+            if (orderResponse.statusCode == 200 &&
+                orderResponse.data['status'] == 200) {
+              final orderData = orderResponse.data['data'];
+              final order = Order.fromJson(orderData);
+
+              // Fetch address details
+              final addressResponse = await _dio.get(
+                TerraApi.getAddress(order.addressId),
+                options: Options(
+                  headers: {
+                    'Authorization': 'Bearer ${event.token}',
+                    'accept': '*/*',
+                  },
+                ),
+              );
+              if (addressResponse.statusCode == 200 &&
+                  addressResponse.data['status'] == 200) {
+                final addressData = addressResponse.data['data'];
+                final address = Address.fromJson(addressData);
+                addresses[transport.orderId] = address;
+              }
+            }
+            transports.add(transport);
+          }
+        }
+
+        emit(TransportsLoaded(transports: transports, addresses: addresses));
+      } else {
+        emit(ShipError(
+            'Failed to load transports: ${response.data['message'] ?? 'Unknown error'}'));
+      }
     } catch (e) {
-      developer.log('Error parsing date: $date, error: $e', name: 'ShipBloc');
-      return 'Unknown Date';
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to load transports: $e'));
+      }
     }
   }
 
-  String _getMonthName(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    return month >= 1 && month <= 12 ? months[month - 1] : 'Unknown';
+  Future<void> _onLoadTransportByOrder(
+      LoadTransportByOrderEvent event, Emitter<ShipState> emit) async {
+    try {
+      final response = await _dio.get(
+        TerraApi.getOrderTransport(event.orderId.toString()),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['status'] == 200) {
+        final transport = Transport.fromJson(response.data['data']);
+        emit(TransportByOrderLoaded(
+            orderId: event.orderId, transport: transport));
+      } else {
+        emit(ShipError(
+            'Failed to load transport: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else if (e.response?.statusCode == 404) {
+          emit(ShipError('Transport not found for this order.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to load transport: $e'));
+      }
+    }
+  }
+
+  Future<void> _onCreateTransport(
+      CreateTransportEvent event, Emitter<ShipState> emit) async {
+    emit(ShipLoading());
+    try {
+      // Calculate estimated completion date (orderDate + 12 hours)
+      final estimatedDate = event.orderDate.add(Duration(hours: 12));
+
+      final requestData = {
+        "orderId": event.orderId,
+        "estimateCompletedDate": estimatedDate.toIso8601String(),
+        "note": event.note,
+        "isRefund": false, // Always false as requested
+        "userId": event.userId,
+      };
+
+      final response = await _dio.post(
+        TerraApi.createTransport(),
+        data: requestData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'Content-Type': 'application/json',
+            'accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['status'] == 1) {
+        final transport = Transport.fromJson(response.data['data']);
+        emit(TransportCreated(transport: transport));
+
+        // Reload shipping orders after creating transport
+        add(LoadShippingOrdersEvent(token: event.token));
+      } else {
+        emit(ShipError(
+            'Failed to create transport: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else if (e.response?.statusCode == 400) {
+          emit(ShipError('Invalid data. Please check your input.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to create transport: $e'));
+      }
+    }
+  }
+
+  Future<void> _onUpdateTransportStatus(
+      UpdateTransportStatusEvent event, Emitter<ShipState> emit) async {
+    try {
+      FormData formData = FormData();
+
+      // Add transport status update fields
+      formData.fields.addAll([
+        MapEntry('transportId', event.transportId.toString()),
+        MapEntry('status', event.status),
+        MapEntry('contactFailNumber', event.contactFailNumber ?? '0706801385'),
+        MapEntry('assignToUserId', event.assignToUserId?.toString() ?? ''),
+      ]);
+
+      // Add reason if provided
+      if (event.reason != null && event.reason!.isNotEmpty) {
+        formData.fields.add(MapEntry('reason', event.reason!));
+      }
+
+      // Add image file if provided
+      if (event.imagePath != null && event.imagePath!.isNotEmpty) {
+        final file = File(event.imagePath!);
+        if (await file.exists()) {
+          formData.files.add(MapEntry(
+            'image',
+            await MultipartFile.fromFile(
+              event.imagePath!,
+              filename: 'transport_${event.transportId}_${event.status}.jpg',
+              contentType: MediaType('image', 'jpeg'),
+            ),
+          ));
+        }
+      }
+
+      final response = await _dio.put(
+        TerraApi.updateTransport(event.transportId.toString()),
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 &&
+          (response.data['status'] == 200 || response.data['status'] == 1)) {
+        final updatedTransport = Transport.fromJson(response.data['data']);
+        emit(TransportUpdated(transport: updatedTransport));
+      } else {
+        emit(ShipError(
+            'Failed to update transport status: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else if (e.response?.statusCode == 404) {
+          emit(ShipError('Transport not found.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to update transport status: $e'));
+      }
+    }
+  }
+
+  Future<void> _onLoadAddressDetails(
+      LoadAddressDetailsEvent event, Emitter<ShipState> emit) async {
+    try {
+      final response = await _dio.get(
+        TerraApi.getAddress(event.addressId),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['status'] == 200) {
+        final address = Address.fromJson(response.data['data']);
+        emit(AddressLoaded(address: address));
+      } else {
+        emit(ShipError(
+            'Failed to load address: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to load address: $e'));
+      }
+    }
   }
 }

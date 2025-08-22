@@ -407,19 +407,6 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
             fontSize: 18,
           ),
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.tune, size: 20),
-              onPressed: _showFilterDialog,
-            ),
-          ),
-        ],
       ),
       body: BlocConsumer<TerrariumBloc, TerrariumState>(
         listener: (context, state) {

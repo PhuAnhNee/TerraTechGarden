@@ -19,6 +19,8 @@ import '../pages/ship/delivery/screens/delivery_screen.dart';
 import '../pages/cart/screens/cart_screen.dart';
 import '../pages/cart/bloc/cart_bloc.dart';
 import '../pages/cart/bloc/cart_event.dart';
+import '../pages/notification/screens/notification_screen.dart';
+import '../pages/cart/widgets/checkout_screen.dart';
 import 'routes.dart';
 import 'dart:developer' as developer;
 
@@ -31,10 +33,31 @@ Map<String, WidgetBuilder> getAppRoutes() {
               CartBloc(storedToken: context.read<AuthBloc>().token),
           child: home_screens.HomeScreen(),
         ),
-    Routes.profile: (context) => BlocProvider(
-          create: (context) => ProfileBloc(),
-          child: profile_screens.ProfileScreen(),
-        ),
+    Routes.profile: (context) {
+      final authBloc = context.read<AuthBloc>();
+      final token = authBloc.token;
+      developer.log('ProfileBloc token: $token', name: 'AppRouter');
+
+      // Check if token exists
+      if (token == null || token.isEmpty) {
+        developer.log('No token found, redirecting to login',
+            name: 'AppRouter');
+        // If no token, redirect to login
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushReplacementNamed(Routes.login);
+        });
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      return BlocProvider(
+        create: (context) => ProfileBloc(),
+        child: profile_screens.ProfileScreen(authToken: token),
+      );
+    },
     Routes.categories: (context) => BlocProvider(
           create: (context) => CategoryBloc(authBloc: context.read<AuthBloc>()),
           child: category_screens.CategoryScreen(),
@@ -54,16 +77,72 @@ Map<String, WidgetBuilder> getAppRoutes() {
         ),
       );
     },
-    Routes.shipperHome: (context) {
+
+    // Fixed ShipBloc routing with proper provider
+    Routes.shipHome: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
-      developer.log('ShipperHome ShipBloc token: $token', name: 'AppRouter');
+      developer.log('ShipHome ShipBloc token: $token', name: 'AppRouter');
+
+      // Check if token exists
+      if (token == null || token.isEmpty) {
+        developer.log('No token found for ShipHome, redirecting to login',
+            name: 'AppRouter');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushReplacementNamed(Routes.login);
+        });
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
       return BlocProvider(
-        create: (context) => ShipBloc(token)..add(FetchOrders()),
+        create: (context) => ShipBloc(),
         child: ShipperHomeScreen(token: token),
       );
     },
-    Routes.delivery: (context) => DeliveryScreen(),
+
+    // Deprecated route - redirects to new shipHome
+    Routes.shipperHome: (context) {
+      developer.log(
+          'Using deprecated shipperHome route, redirecting to shipHome',
+          name: 'AppRouter');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushReplacementNamed(Routes.shipHome);
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    },
+
+    Routes.delivery: (context) {
+      final authBloc = context.read<AuthBloc>();
+      final token = authBloc.token;
+
+      // Check if token exists
+      if (token == null || token.isEmpty) {
+        developer.log('No token found for delivery, redirecting to login',
+            name: 'AppRouter');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushReplacementNamed(Routes.login);
+        });
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      return BlocProvider(
+        create: (context) => ShipBloc(),
+        child: DeliveryScreen(),
+      );
+    },
+
     Routes.cart: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
@@ -73,6 +152,13 @@ Map<String, WidgetBuilder> getAppRoutes() {
         child: CartScreen(),
       );
     },
+    Routes.checkout: (context) => CheckoutScreen(
+          totalAmount:
+              ModalRoute.of(context)!.settings.arguments as double? ?? 0.0,
+        ),
+    Routes.notification: (context) => NotificationScreen(
+          userId: ModalRoute.of(context)!.settings.arguments as String,
+        ),
     Routes.error: (context) => const Scaffold(
           body: Center(
             child: Text(

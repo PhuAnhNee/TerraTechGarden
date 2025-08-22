@@ -210,22 +210,7 @@ class LoginScreen extends StatelessWidget {
                                     context, Routes.home);
                               }
                             } else if (state is AuthFailure) {
-                              Message.showError(
-                                context: context,
-                                message: state.error,
-                                onRetry: () {
-                                  final username =
-                                      _usernameController.text.trim();
-                                  final password =
-                                      _passwordController.text.trim();
-                                  context.read<AuthBloc>().add(
-                                        LoginRequested(
-                                          username: username,
-                                          password: password,
-                                        ),
-                                      );
-                                },
-                              );
+                              _showErrorNotification(context, state.error);
                             }
                           },
                           child: BlocBuilder<AuthBloc, AuthState>(
@@ -295,10 +280,7 @@ class LoginScreen extends StatelessWidget {
                                 print('Navigated to register screen');
                               } catch (e) {
                                 print('Navigation error: $e');
-                                Message.showError(
-                                  context: context,
-                                  message: 'Lỗi điều hướng: $e',
-                                );
+                                _showErrorNotification(context, 'Lỗi hệ thống');
                               }
                             },
                             child: Text(
@@ -384,8 +366,7 @@ class LoginScreen extends StatelessWidget {
   //     await performGoogleLogin(context, accessToken);
   //   } catch (e) {
   //     print('Firebase Google Sign-In Error: $e');
-  //     Message.showError(
-  //         context: context, message: 'Lỗi đăng nhập Google: ${e.toString()}');
+  //     _showErrorNotification(context, 'Lỗi hệ thống');
   //   }
   // }
 
@@ -394,27 +375,28 @@ class LoginScreen extends StatelessWidget {
       builder: (context) => Positioned(
         top: MediaQuery.of(context).padding.top + 16.0,
         left: 16.0,
-        right: 16.0, // Ensure it doesn't overflow on small screens
+        right: 16.0,
         child: Material(
           color: Colors.transparent,
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             decoration: BoxDecoration(
-              color: Color(0xFF26A69A),
-              borderRadius: BorderRadius.circular(8.0),
+              color: Color(0xFF4CAF50),
+              borderRadius: BorderRadius.circular(12.0),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4.0,
-                  offset: Offset(0, 2),
+                  color: Colors.black12,
+                  blurRadius: 8.0,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
+                Icon(Icons.check_circle_outline,
+                    color: Colors.white, size: 22.0),
+                SizedBox(width: 12.0),
                 Flexible(
                   child: Text(
                     'Đăng nhập thành công',
@@ -438,5 +420,92 @@ class LoginScreen extends StatelessWidget {
     Future.delayed(Duration(seconds: 2), () {
       overlayEntry.remove();
     });
+  }
+
+  void _showErrorNotification(BuildContext context, String error) {
+    String displayMessage = _getSimpleErrorMessage(error);
+
+    OverlayEntry overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16.0,
+        left: 16.0,
+        right: 16.0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            decoration: BoxDecoration(
+              color: Color(0xFF26A69A), // Teal color instead of red
+              borderRadius: BorderRadius.circular(12.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 8.0,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline, color: Colors.white, size: 22.0),
+                SizedBox(width: 12.0),
+                Flexible(
+                  child: Text(
+                    displayMessage,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16.0,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
+
+    Future.delayed(Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
+
+  String _getSimpleErrorMessage(String error) {
+    // Convert complex error messages to simple user-friendly messages
+    String lowerError = error.toLowerCase();
+
+    if (lowerError.contains('password') ||
+        lowerError.contains('username') ||
+        lowerError.contains('credential') ||
+        lowerError.contains('invalid') ||
+        lowerError.contains('wrong') ||
+        lowerError.contains('incorrect') ||
+        lowerError.contains('sai') ||
+        lowerError.contains('không đúng') ||
+        lowerError.contains('không tồn tại')) {
+      return 'Sai tên đăng nhập hoặc mật khẩu';
+    }
+
+    if (lowerError.contains('network') ||
+        lowerError.contains('connection') ||
+        lowerError.contains('timeout') ||
+        lowerError.contains('kết nối') ||
+        lowerError.contains('mạng')) {
+      return 'Lỗi kết nối mạng';
+    }
+
+    if (lowerError.contains('server') ||
+        lowerError.contains('service') ||
+        lowerError.contains('máy chủ')) {
+      return 'Lỗi hệ thống';
+    }
+
+    // Default fallback for any other errors
+    return 'Lỗi hệ thống';
   }
 }

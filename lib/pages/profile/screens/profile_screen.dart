@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../bloc/profile_bloc.dart';
 import '../../../models/user.dart';
 import '../bloc/profile_state.dart';
 import '../bloc/profile_event.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String authToken;
+
+  const ProfileScreen({super.key, required this.authToken});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -22,10 +26,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _dobController = TextEditingController();
   final _genderController = TextEditingController();
 
+  User? _currentUser;
+  final ImagePicker _picker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
-    context.read<ProfileBloc>().add(LoadProfileEvent());
+    context.read<ProfileBloc>().add(LoadProfileEvent(token: widget.authToken));
   }
 
   @override
@@ -40,19 +47,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      final user = User(
-        userId: 1,
-        username: _usernameController.text,
-        passwordHash: '',
+    if (_formKey.currentState!.validate() && _currentUser != null) {
+      final user = _currentUser!.copyWith(
+        fullName: _nameController.text,
         email: _emailController.text,
         phoneNumber: _phoneController.text,
-        fullName: _nameController.text,
         dateOfBirth: _dobController.text,
         gender: _genderController.text,
       );
+
       final bloc = context.read<ProfileBloc>();
-      bloc.add(UpdateProfileEvent(user: user));
+      bloc.add(UpdateProfileEvent(user: user, token: widget.authToken));
+    }
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        File imageFile = File(image.path);
+        context.read<ProfileBloc>().add(
+            UpdateAvatarEvent(avatarFile: imageFile, token: widget.authToken));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAndUploadBackground() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        File imageFile = File(image.path);
+        context.read<ProfileBloc>().add(UpdateBackgroundEvent(
+            backgroundFile: imageFile, token: widget.authToken));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: Colors.red[600],
+        ),
+      );
     }
   }
 
@@ -127,17 +180,194 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildProfileAvatar() {
+    return Stack(
+      children: [
+        Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: _currentUser?.avatarUrl != null &&
+                  _currentUser!.avatarUrl!.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(50),
+                  child: Image.network(
+                    _currentUser!.avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF4CAF50), Color(0xFF45A049)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.person,
+                          size: 50,
+                          color: Colors.white,
+                        ),
+                      );
+                    },
+                  ),
+                )
+              : Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF45A049)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: GestureDetector(
+            onTap: _pickAndUploadAvatar,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey[300]!, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                size: 16,
+                color: Color(0xFF4CAF50),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderDropdown() {
+    // Ensure the value is one of the allowed options or null
+    String? dropdownValue =
+        ['Male', 'Female', 'Other'].contains(_genderController.text)
+            ? _genderController.text
+            : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: DropdownButtonFormField<String>(
+        value: dropdownValue,
+        validator: (value) =>
+            value == null || value.isEmpty ? 'Please select your gender' : null,
+        decoration: InputDecoration(
+          labelText: 'Gender',
+          labelStyle: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4CAF50), Color(0xFF45A049)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.people_outline,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        ),
+        items: const [
+          DropdownMenuItem(value: 'Male', child: Text('Male')),
+          DropdownMenuItem(value: 'Female', child: Text('Female')),
+          DropdownMenuItem(value: 'Other', child: Text('Other')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _genderController.text = value ?? '';
+          });
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<ProfileBloc, ProfileState>(
       listener: (context, state) {
         if (state is ProfileLoaded) {
+          _currentUser = state.user;
           _nameController.text = state.user.fullName;
           _emailController.text = state.user.email;
           _phoneController.text = state.user.phoneNumber;
           _usernameController.text = state.user.username;
           _dobController.text = state.user.dateOfBirth;
           _genderController.text = state.user.gender;
+
+          // Show success message only on update
+          if (state is! ProfileLoaded || _currentUser != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('Profile updated successfully'),
+                  ],
+                ),
+                backgroundColor: Colors.green[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
         } else if (state is ProfileError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -195,7 +425,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Icons.arrow_back_ios_new,
                   color: Colors.white,
                 ),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.pushNamed(context, '/shipHome'),
               ),
             ),
             SliverToBoxAdapter(
@@ -259,34 +489,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     Center(
                                       child: Column(
                                         children: [
-                                          Container(
-                                            width: 100,
-                                            height: 100,
-                                            decoration: BoxDecoration(
-                                              gradient: const LinearGradient(
-                                                colors: [
-                                                  Color(0xFF4CAF50),
-                                                  Color(0xFF45A049)
-                                                ],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              ),
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.green
-                                                      .withOpacity(0.3),
-                                                  blurRadius: 20,
-                                                  offset: const Offset(0, 10),
-                                                ),
-                                              ],
-                                            ),
-                                            child: const Icon(
-                                              Icons.person,
-                                              size: 50,
-                                              color: Colors.white,
-                                            ),
-                                          ),
+                                          _buildProfileAvatar(),
                                           const SizedBox(height: 16),
                                           Text(
                                             'Edit Your Profile',
@@ -316,15 +519,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       icon: Icons.person_outline,
                                       validator: (value) => value!.isEmpty
                                           ? 'Please enter your full name'
-                                          : null,
-                                    ),
-
-                                    _buildTextField(
-                                      controller: _usernameController,
-                                      label: 'Username',
-                                      icon: Icons.alternate_email,
-                                      validator: (value) => value!.isEmpty
-                                          ? 'Please enter a username'
                                           : null,
                                     ),
 
@@ -382,16 +576,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           : null,
                                     ),
 
-                                    _buildTextField(
-                                      controller: _genderController,
-                                      label: 'Gender',
-                                      icon: Icons.people_outline,
-                                      validator: (value) => value!.isEmpty
-                                          ? 'Please enter your gender'
-                                          : null,
+                                    _buildGenderDropdown(),
+
+                                    const SizedBox(height: 16),
+
+                                    // Background Image Upload Button
+                                    Container(
+                                      width: double.infinity,
+                                      height: 56,
+                                      margin: const EdgeInsets.only(bottom: 16),
+                                      child: OutlinedButton.icon(
+                                        onPressed: _pickAndUploadBackground,
+                                        icon: const Icon(
+                                          Icons.wallpaper,
+                                          color: Color(0xFF4CAF50),
+                                        ),
+                                        label: const Text(
+                                          'Update Background Image',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF4CAF50),
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(
+                                            color: Color(0xFF4CAF50),
+                                            width: 2,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                      ),
                                     ),
 
-                                    const SizedBox(height: 32),
+                                    const SizedBox(height: 16),
 
                                     // Save Button
                                     SizedBox(
@@ -498,6 +719,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: Colors.grey[600],
                               ),
                               textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                context.read<ProfileBloc>().add(
+                                    LoadProfileEvent(token: widget.authToken));
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4CAF50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Retry',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ],
                         ),

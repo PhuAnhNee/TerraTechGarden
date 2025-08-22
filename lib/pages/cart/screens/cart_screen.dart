@@ -37,12 +37,32 @@ class _CartScreenState extends State<CartScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Sử dụng pop thay vì pushReplacementNamed để quay lại trang trước
+            Navigator.pop(context);
+
+            // Hoặc nếu bắt buộc phải dùng pushReplacementNamed, thêm arguments:
+            // Navigator.pushReplacementNamed(
+            //   context,
+            //   '/terrarium-detail',
+            //   arguments: 'your_terrarium_id_here', // Thêm ID cần thiết
+            // );
+          },
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: () {},
+            onPressed: () {
+              // Tương tự cho nút edit
+              Navigator.pop(context);
+
+              // Hoặc với arguments:
+              // Navigator.pushReplacementNamed(
+              //   context,
+              //   '/terrarium-detail',
+              //   arguments: 'your_terrarium_id_here',
+              // );
+            },
           ),
         ],
       ),

@@ -1,678 +1,755 @@
+// screens/shipper_home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../../../../navigation/routes.dart';
-import '../../delivery/screens/delivery_screen.dart';
+import 'package:intl/intl.dart';
 import '../bloc/ship_bloc.dart';
 import '../bloc/ship_event.dart';
 import '../bloc/ship_state.dart';
-import '../../../../components/ship_detail.dart';
+import '../widgets/transport_cart.dart';
 
 class ShipperHomeScreen extends StatefulWidget {
-  final String? token;
+  final String token;
 
-  const ShipperHomeScreen({super.key, this.token});
+  const ShipperHomeScreen({
+    Key? key,
+    required this.token,
+  }) : super(key: key);
 
   @override
-  State<ShipperHomeScreen> createState() => _ShipperHomeScreenState();
+  State<ShipperHomeScreen> createState() => _HomeScreenState();
 }
 
-class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
+class _HomeScreenState extends State<ShipperHomeScreen>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
+  int _selectedIndex = 0;
+
   @override
   void initState() {
     super.initState();
-    context.read<ShipBloc>().add(FetchOrders());
+    _tabController = TabController(length: 2, vsync: this);
+    _loadInitialData();
   }
 
-  Widget _progressStep(String title, bool isActive, bool isEnabled) {
-    return GestureDetector(
-      onTap: isEnabled
-          ? () {
-              if (title == "Delivered") {
-                _showPhotoConfirmation(title);
-              } else {
-                _updateOrderStep(title);
-              }
-            }
-          : null,
-      child: Column(
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: isActive
-                  ? Colors.green
-                  : (isEnabled ? Colors.grey : Colors.grey[600]),
-              shape: BoxShape.circle,
-            ),
-            child: isActive
-                ? const Icon(Icons.check, color: Colors.white, size: 14)
-                : null,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              color: isActive
-                  ? Colors.green
-                  : (isEnabled ? Colors.grey : Colors.grey[600]),
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
-  Widget _progressLine(bool isActive) {
-    return Container(
-      height: 2,
-      color: isActive ? Colors.green : Colors.grey[600],
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-    );
+  void _loadInitialData() {
+    // Load available orders initially
+    context.read<ShipBloc>().add(LoadAvailableOrdersEvent(token: widget.token));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1a1a1a),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1a1a1a),
-        elevation: 0,
-        title: Row(
-          children: const [
-            Text(
-              "Active ",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
+      appBar: _buildAppBar(),
+      body: Column(
+        children: [
+          _buildUserWelcome(),
+          _buildStatsCards(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOrdersTab(),
+                _buildTransportsTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF2a2a2a),
+      elevation: 0,
+      title: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(255, 41, 150, 45),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.local_shipping,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          SizedBox(width: 12),
+          Text(
+            'Terra Shipping',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: Colors.white),
+          color: const Color(0xFF2a2a2a),
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'profile',
+              onTap: () {
+                // Điều hướng về màn hình login
+                Navigator.pushReplacementNamed(context, '/profile');
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.person, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text('Hồ sơ', style: TextStyle(color: Colors.white)),
+                ],
               ),
             ),
-            Text(
-              "Shipments",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.normal,
-                fontSize: 24,
+            PopupMenuItem(
+              value: 'logout',
+              onTap: () {
+                // Điều hướng về màn hình login
+                Navigator.pushReplacementNamed(context, '/login');
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.logout, color: Colors.red, size: 18),
+                  SizedBox(width: 8),
+                  Text('Đăng xuất', style: TextStyle(color: Colors.red)),
+                ],
               ),
             ),
           ],
         ),
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none,
-                    color: Colors.white, size: 28),
-                onPressed: () {},
-              ),
-              Positioned(
-                right: 12,
-                top: 12,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
+      ],
+    );
+  }
+
+  Widget _buildUserWelcome() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    String greeting = 'Chào buổi sáng';
+
+    if (hour >= 12 && hour < 18) {
+      greeting = 'Chào buổi chiều';
+    } else if (hour >= 18) {
+      greeting = 'Chào buổi tối';
+    }
+
+    return Container(
+      margin: EdgeInsets.all(16),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color.fromARGB(255, 41, 150, 45),
+            const Color.fromARGB(255, 35, 125, 38),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(255, 41, 150, 45).withOpacity(0.3),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$greeting!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-            ],
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'logout') {
-                Navigator.pushReplacementNamed(context, '/login');
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
+                SizedBox(height: 4),
+                Text(
+                  'Shipper', // Fixed: removed dependency on userInfo
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
-            child: const Padding(
-              padding: EdgeInsets.only(right: 8.0),
-              child: CircleAvatar(
-                backgroundColor: Colors.grey,
-                radius: 16,
-              ),
+                SizedBox(height: 4),
+                Text(
+                  // Fixed: Use default locale instead of 'vi_VN'
+                  DateFormat('EEEE, dd/MM/yyyy').format(now),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 30,
             ),
           ),
         ],
-      ),
-      body: BlocBuilder<ShipBloc, ShipState>(
-        builder: (context, state) {
-          if (state is ShipLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is ShipLoaded) {
-            final orders = state.orders;
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<ShipBloc>().add(FetchOrders());
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2a2a2a),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.search, color: Colors.grey, size: 20),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "Search",
-                              style:
-                                  TextStyle(color: Colors.grey, fontSize: 16),
-                            ),
-                          ),
-                          Icon(Icons.tune, color: Colors.grey, size: 20),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    ...orders
-                        .where((order) =>
-                            order['status'] != 'available' &&
-                            order['status'] != 'cancelled')
-                        .map((order) => _activeShipmentItem(order))
-                        .toList(),
-                    if (orders
-                        .where((order) => order['status'] == 'available')
-                        .isNotEmpty) ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Text(
-                            "Recent Shipping",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "See all",
-                            style: TextStyle(color: Colors.green),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: orders
-                            .where((order) => order['status'] == 'available')
-                            .length,
-                        itemBuilder: (context, index) {
-                          final availableOrders = orders
-                              .where((order) => order['status'] == 'available')
-                              .toList();
-                          final order = availableOrders[index];
-                          return _availableOrderItem(order);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          } else if (state is ShipError) {
-            return Center(
-                child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(state.message,
-                    style: const TextStyle(color: Colors.white)),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    context.read<ShipBloc>().add(FetchOrders());
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
-            ));
-          }
-          return const Center(
-              child: Text("No data available",
-                  style: TextStyle(color: Colors.white)));
-        },
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        selectedItemColor: const Color(0xFF1D7020),
-        unselectedItemColor: Colors.grey,
-        backgroundColor: const Color(0xFF1a1a1a),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map_outlined),
-            label: "Map",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: "Profile",
-          ),
-        ],
-        currentIndex: 0,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.pushNamed(context, Routes.delivery);
-          } else if (index == 2) {
-            Navigator.pushNamed(context, Routes.profile);
-          }
-        },
       ),
     );
   }
 
-  Widget _activeShipmentItem(Map<String, dynamic> order) {
-    return GestureDetector(
-      onTap: () {
-        final userId = order['userId'] as int?;
-        if (userId != null && userId != 0) {
-          showDialog(
-            context: context,
-            builder: (context) => ShipDetail(userId: userId),
-          );
-        } else {
-          _showOrderDetails(order);
-        }
+  Widget _buildStatsCards() {
+    return BlocBuilder<ShipBloc, ShipState>(
+      builder: (context, state) {
+        return Container(
+          height: 120,
+          margin: EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Đơn hàng',
+                  '${_getTotalOrdersCount(state)}',
+                  Icons.shopping_cart,
+                  Colors.orange,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  'Vận đơn',
+                  '${_getTotalTransportsCount(state)}',
+                  Icons.local_shipping,
+                  Colors.blue,
+                ),
+              ),
+            ],
+          ),
+        );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2a2a2a),
-          borderRadius: BorderRadius.circular(12),
-          border: Border(
-            left: BorderSide(
-              color: _getStatusColor(order['status']?.toString() ?? 'unknown'),
-              width: 4,
+    );
+  }
+
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2a2a2a),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              Spacer(),
+              Text(
+                value,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersTab() {
+    return BlocBuilder<ShipBloc, ShipState>(
+      builder: (context, state) {
+        if (state is ShipLoading) {
+          return _buildLoadingWidget('Đang tải đơn hàng...');
+        }
+
+        if (state is ShipError) {
+          return _buildErrorWidget(state.message, () {
+            context
+                .read<ShipBloc>()
+                .add(LoadAvailableOrdersEvent(token: widget.token));
+          });
+        }
+
+        if (state is OrdersLoaded) {
+          if (state.orders.isEmpty) {
+            return _buildEmptyWidget(
+              Icons.shopping_cart_outlined,
+              'Không có đơn hàng',
+              'Chưa có đơn hàng nào cần xử lý',
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              context
+                  .read<ShipBloc>()
+                  .add(LoadAvailableOrdersEvent(token: widget.token));
+            },
+            child: ListView.builder(
+              padding: EdgeInsets.all(16),
+              itemCount: state.orders.length,
+              itemBuilder: (context, index) {
+                final order = state.orders[index];
+                final address = state.addresses[order.addressId];
+                return _buildOrderCard(order, address);
+              },
+            ),
+          );
+        }
+
+        return _buildEmptyWidget(
+          Icons.refresh,
+          'Kéo để tải lại',
+          'Vuốt xuống để tải đơn hàng mới',
+        );
+      },
+    );
+  }
+
+  Widget _buildTransportsTab() {
+    return TransportCart(
+      token: widget.token,
+    );
+  }
+
+  Widget _buildOrderCard(dynamic order, dynamic address) {
+    final formatter = NumberFormat('#,##0', 'vi_VN');
+    final dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      color: const Color(0xFF2a2a2a),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color.fromARGB(255, 41, 150, 45),
+            width: 2,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    order['orderId']?.toString() ?? 'Unknown Order',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Order Header
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 41, 150, 45)
+                          .withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.shopping_cart,
+                      color: const Color.fromARGB(255, 41, 150, 45),
+                      size: 20,
                     ),
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(
-                        order['status']?.toString() ?? 'unknown'),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    order['status']?.toString().toUpperCase() ?? 'UNKNOWN',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Progress steps row
-            Row(
-              children: [
-                _progressStep(
-                    "Picked", order['steps']?['picked'] ?? false, true),
-                Expanded(
-                    child: _progressLine(order['steps']?['picked'] ?? false)),
-                _progressStep(
-                    "Delivering",
-                    order['steps']?['delivering'] ?? false,
-                    order['steps']?['picked'] ?? false),
-                Expanded(
-                    child:
-                        _progressLine(order['steps']?['delivering'] ?? false)),
-                _progressStep(
-                    "Delivered",
-                    order['steps']?['delivered'] ?? false,
-                    order['steps']?['delivering'] ?? false),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                const Icon(Icons.person, color: Colors.grey, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    order['customerName']?.toString() ?? 'Unknown Customer',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.phone, color: Colors.grey, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  order['receiverPhone']?.toString() ?? 'Unknown Phone',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.location_on, color: Colors.grey, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    order['customerAddress']?.toString() ?? 'Unknown Address',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.access_time, color: Colors.grey, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      order['date']?.toString() ?? 'Unknown Date',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-                if (order['totalAmount'] != null)
-                  Text(
-                    '${_formatCurrency(order['totalAmount'])} VND',
-                    style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Navigation button row
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Get location from order data
-                      final location = order['location'] as LatLng?;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DeliveryScreen(
-                            destinationLatLng: location,
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đơn hàng #${order.orderId}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      "Navigate to Delivery",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                        Text(
+                          dateFormatter.format(order.orderDate),
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                if (order['steps']?['picked'] == true &&
-                    order['steps']?['delivering'] == true &&
-                    order['status'] != 'cancelled') ...[
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => _showCancelOrderDialog(order),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 41, 150, 45)
+                          .withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      "Hủy đơn",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    child: Text(
+                      order.paymentStatus ?? 'Chờ xử lý',
+                      style: TextStyle(
+                        color: const Color.fromARGB(255, 41, 150, 45),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+              ),
 
-  Widget _availableOrderItem(Map<String, dynamic> order) {
-    return GestureDetector(
-      onTap: () {
-        final userId = order['userId'] as int?;
-        if (userId != null && userId != 0) {
-          showDialog(
-            context: context,
-            builder: (context) => ShipDetail(userId: userId),
-          );
-        } else {
-          _showOrderDetails(order);
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2a2a2a),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _getStatusColor(order['status']?.toString() ?? 'unknown'),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    order['orderId']?.toString() ?? 'Unknown Order',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+              SizedBox(height: 16),
+
+              // Customer Information
+              if (address != null) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(
-                        order['status']?.toString() ?? 'unknown'),
+                    color: const Color(0xFF1a1a1a),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    order['status']?.toString().toUpperCase() ?? 'UNKNOWN',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.person,
+                              color: const Color.fromARGB(255, 41, 150, 45),
+                              size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Thông tin khách hàng',
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 41, 150, 45),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      _buildOrderInfoRow(
+                          Icons.person_outline, address.receiverName),
+                      _buildOrderInfoRow(Icons.phone, address.receiverPhone),
+                      _buildOrderInfoRow(
+                          Icons.location_on, address.receiverAddress,
+                          isAddress: true),
+                    ],
                   ),
                 ),
+                SizedBox(height: 12),
               ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.person, color: Colors.grey, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    order['customerName']?.toString() ?? 'Unknown Customer',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
+
+              // Order Total
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1a1a1a),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.phone, color: Colors.grey, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  order['receiverPhone']?.toString() ?? 'Unknown Phone',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.location_on, color: Colors.grey, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    order['customerAddress']?.toString() ?? 'Unknown Address',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.access_time, color: Colors.grey, size: 16),
-                    const SizedBox(width: 6),
                     Text(
-                      order['date']?.toString() ?? 'Unknown Date',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      'Tổng tiền:',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      '${formatter.format(order.totalAmount)} VNĐ',
+                      style: TextStyle(
+                        color: const Color.fromARGB(255, 41, 150, 45),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
-                if (order['totalAmount'] != null)
-                  Text(
-                    '${_formatCurrency(order['totalAmount'])} VND',
-                    style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
+              ),
+
+              SizedBox(height: 16),
+
+              // Action Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showCreateTransportDialog(order),
+                  icon: Icon(Icons.local_shipping),
+                  label: Text(
+                    'TẠO VẬN ĐƠN',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => _showCancelOrderDialog(order),
-                  child: const Text(
-                    "Cancel",
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => _showAcceptOrderDialog(order),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: const Color.fromARGB(255, 41, 150, 45),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    "Accept",
-                    style: TextStyle(color: Colors.white),
-                  ),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'available':
-        return Colors.blue;
-      case 'picked':
-        return Colors.orange;
-      case 'delivering':
-        return Colors.purple;
-      case 'delivered':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
+  Widget _buildOrderInfoRow(IconData icon, String text,
+      {bool isAddress = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment:
+            isAddress ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.grey.shade400, size: 14),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+              maxLines: isAddress ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(
+              const Color.fromARGB(255, 41, 150, 45),
+            ),
+          ),
+          SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(String message, VoidCallback onRetry) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.red.shade400,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Có lỗi xảy ra',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.red.shade600,
+            ),
+          ),
+          SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade400,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: Icon(Icons.refresh),
+            label: Text('Thử lại'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 41, 150, 45),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyWidget(IconData icon, String title, String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF2a2a2a),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        backgroundColor: const Color(0xFF2a2a2a),
+        selectedItemColor: const Color.fromARGB(255, 41, 150, 45),
+        unselectedItemColor: Colors.grey.shade400,
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+          _tabController.animateTo(index);
+          _loadTabData(index);
+        },
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_cart),
+            label: 'Đơn hàng',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_shipping),
+            label: 'Vận đơn',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    return FloatingActionButton(
+      onPressed: _refreshCurrentTab,
+      backgroundColor: const Color.fromARGB(255, 41, 150, 45),
+      child: Icon(Icons.refresh, color: Colors.white),
+    );
+  }
+
+  // Helper methods
+  int _getTotalOrdersCount(ShipState state) {
+    if (state is OrdersLoaded && _selectedIndex == 0) {
+      return state.orders.length;
+    }
+    return 0;
+  }
+
+  int _getTotalTransportsCount(ShipState state) {
+    if (state is TransportsLoaded && _selectedIndex == 1) {
+      return state.transports.length;
+    }
+    return 0;
+  }
+
+  int _getCompletedOrdersCount(ShipState state) {
+    if (state is TransportsLoaded) {
+      return state.transports.where((t) => t.status == 'completed').length;
+    }
+    return 0;
+  }
+
+  void _loadTabData(int index) {
+    switch (index) {
+      case 0:
+        context
+            .read<ShipBloc>()
+            .add(LoadAvailableOrdersEvent(token: widget.token));
+        break;
+      case 1:
+        context.read<ShipBloc>().add(LoadTransportsEvent(token: widget.token));
+        break;
     }
   }
 
-  String _formatCurrency(dynamic amount) {
-    if (amount == null) return '0';
-    return amount.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        );
+  void _refreshCurrentTab() {
+    _loadTabData(_selectedIndex);
   }
 
-  void _showOrderDetails(Map<String, dynamic> order) {
+  void _showCreateTransportDialog(dynamic order) {
+    final TextEditingController noteController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -680,46 +757,82 @@ class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        title: const Text(
-          'Order Details',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          'Tạo vận đơn',
+          style: TextStyle(color: Colors.white),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow(
-                  'Order ID:', order['orderId']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow(
-                  'Customer:', order['customerName']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow(
-                  'Phone:', order['receiverPhone']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Address:',
-                  order['customerAddress']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Date:', order['date']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Status:',
-                  order['status']?.toString().toUpperCase() ?? 'Unknown'),
-              if (order['totalAmount'] != null) ...[
-                const SizedBox(height: 8),
-                _buildDetailRow(
-                    'Amount:', '${_formatCurrency(order['totalAmount'])} VND',
-                    valueColor: Colors.green),
-              ],
-            ],
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Đơn hàng #${order.orderId}',
+              style: TextStyle(
+                color: const Color.fromARGB(255, 41, 150, 45),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Ghi chú vận chuyển:',
+              style: TextStyle(
+                color: Colors.grey.shade400,
+                fontSize: 14,
+              ),
+            ),
+            SizedBox(height: 8),
+            TextField(
+              controller: noteController,
+              maxLines: 3,
+              style: TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Nhập ghi chú cho vận đơn...',
+                hintStyle: TextStyle(color: Colors.grey.shade500),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade600),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                      color: const Color.fromARGB(255, 41, 150, 45), width: 2),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade600),
+                ),
+                contentPadding: EdgeInsets.all(12),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: Colors.grey),
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Hủy',
+              style: TextStyle(color: Colors.grey.shade400),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<ShipBloc>().add(
+                    CreateTransportEvent(
+                      token: widget.token,
+                      orderId: order.orderId,
+                      userId: order.userId, // Fixed: use order.userId
+                      orderDate: order.orderDate,
+                      note: noteController.text.trim(),
+                    ),
+                  );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 41, 150, 45),
+            ),
+            child: Text(
+              'Tạo vận đơn',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -727,272 +840,13 @@ class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: const TextStyle(color: Colors.grey, fontSize: 14),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? Colors.white,
-              fontSize: 14,
-              fontWeight:
-                  valueColor != null ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showAcceptOrderDialog(Map<String, dynamic> order) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2a2a2a),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: const Text(
-            "Xác nhận nhận đơn hàng",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow(
-                  'Mã đơn:', order['orderId']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Khách hàng:',
-                  order['customerName']?.toString() ?? 'Unknown'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Địa chỉ:',
-                  order['customerAddress']?.toString() ?? 'Unknown'),
-              if (order['totalAmount'] != null) ...[
-                const SizedBox(height: 8),
-                _buildDetailRow(
-                    'Số tiền:', '${_formatCurrency(order['totalAmount'])} VND',
-                    valueColor: Colors.green),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  order['status'] = 'picked';
-                  order['steps']['picked'] = true;
-                });
-                _showSuccessSnackBar('Đã nhận đơn hàng thành công');
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child:
-                  const Text("Xác nhận", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showCancelOrderDialog(Map<String, dynamic> order) {
-    String? selectedReason;
-    final TextEditingController _reasonController = TextEditingController();
-    final List<String> reasons = [
-      'Không đủ thời gian giao hàng',
-      'Địa chỉ không hợp lệ',
-      'Khách hàng yêu cầu hủy',
-      'Lý do khác'
-    ];
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF2a2a2a),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              title: const Text(
-                "Hủy đơn hàng",
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(
-                        'Mã đơn:', order['orderId']?.toString() ?? 'Unknown'),
-                    const SizedBox(height: 8),
-                    _buildDetailRow('Khách hàng:',
-                        order['customerName']?.toString() ?? 'Unknown'),
-                    const SizedBox(height: 8),
-                    _buildDetailRow('Địa chỉ:',
-                        order['customerAddress']?.toString() ?? 'Unknown'),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Lý do hủy:",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      dropdownColor: const Color(0xFF2a2a2a),
-                      value: selectedReason,
-                      hint: const Text(
-                        "Chọn lý do",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      items: reasons.map((String reason) {
-                        return DropdownMenuItem<String>(
-                          value: reason,
-                          child: Text(
-                            reason,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setDialogState(() {
-                          selectedReason = newValue;
-                        });
-                      },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Color(0xFF3a3a3a),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _reasonController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        hintText: "Nhập lý do chi tiết (nếu có)",
-                        hintStyle: TextStyle(color: Colors.grey),
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Color(0xFF3a3a3a),
-                      ),
-                      maxLines: 3,
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child:
-                      const Text("Hủy", style: TextStyle(color: Colors.grey)),
-                ),
-                ElevatedButton(
-                  onPressed: selectedReason == null
-                      ? null
-                      : () {
-                          Navigator.of(context).pop();
-                          setState(() {
-                            order['status'] = 'cancelled';
-                            order['cancelReason'] = selectedReason;
-                            order['cancelDetails'] = _reasonController.text;
-                          });
-                          _showSuccessSnackBar('Đã hủy đơn hàng');
-                        },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text(
-                    "Xác nhận",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showSuccessSnackBar(String message) {
+  // Placeholder methods for menu actions and notifications
+  void _showNotifications() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
+        content: Text('Thông báo sẽ được triển khai sau'),
+        backgroundColor: Colors.blue.shade600,
       ),
-    );
-  }
-
-  void _updateOrderStep(String step) {
-    setState(() {
-      context.read<ShipBloc>().add(FetchOrders());
-    });
-  }
-
-  void _showPhotoConfirmation(String step) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2a2a2a),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: const Text(
-            "Xác nhận đã giao hàng",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "Vui lòng chụp ảnh xác nhận đã giao hàng thành công",
-                style: TextStyle(color: Colors.white),
-              ),
-              SizedBox(height: 16),
-              Icon(
-                Icons.camera_alt,
-                color: Colors.green,
-                size: 48,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  context.read<ShipBloc>().add(FetchOrders());
-                });
-                _showSuccessSnackBar('Đã chụp ảnh xác nhận');
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child:
-                  const Text("Chụp ảnh", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
     );
   }
 }

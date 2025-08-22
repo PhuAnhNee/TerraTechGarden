@@ -4,10 +4,6 @@ import '../../../widgets/navbar.dart';
 import '../../../widgets/footer.dart';
 import '../bloc/home_bloc.dart';
 import '../bloc/home_event.dart';
-import '../bloc/home_state.dart';
-import '../../accessory/screens/accessory_screen.dart';
-import '../../terrarium/screens/terrarium_screen.dart';
-import '../../blog/screens/blog_screen.dart';
 import '../../../navigation/routes.dart';
 import '../../terrarium/bloc/terrarium_bloc.dart';
 import '../../terrarium/bloc/terrarium_event.dart';
@@ -223,7 +219,7 @@ class HomeScreen extends StatelessWidget {
           actions: [
             IconButton(
               icon: const Icon(Icons.shopping_cart, color: Colors.white),
-              onPressed: () {},
+              onPressed: () => Navigator.pushReplacementNamed(context, '/cart'),
             ),
           ],
         ),

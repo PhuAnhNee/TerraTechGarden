@@ -236,19 +236,19 @@ class TerrariumCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.attach_money,
-                            size: 14,
-                            color: Color(0xFF1D7020),
-                          ),
-                          Text(
-                            minPrice == maxPrice
-                                ? '${minPrice}đ'
-                                : '${minPrice} - ${maxPrice}đ',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1D7020),
+                          Flexible(
+                            child: Text(
+                              minPrice == maxPrice
+                                  ? '${minPrice}đ'
+                                  : '${minPrice} - ${maxPrice}đ',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1D7020),
+                              ),
+                              overflow:
+                                  TextOverflow.ellipsis, // Handle text overflow
+                              maxLines: 1, // Limit to one line
                             ),
                           ),
                         ],
