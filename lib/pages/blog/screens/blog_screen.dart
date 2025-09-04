@@ -4,6 +4,7 @@ import '../bloc/blog_bloc.dart';
 import '../bloc/blog_event.dart';
 import '../bloc/blog_state.dart';
 import '../../../components/blog_card.dart';
+import '../widgets/blog_detail.dart'; // Import the popup component
 
 class BlogScreen extends StatefulWidget {
   const BlogScreen({super.key});
@@ -45,21 +46,21 @@ class _BlogScreenState extends State<BlogScreen> {
   }
 
   void _onBlogTap(Map<String, dynamic> blog) {
-    // Navigate to blog detail screen
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => BlogDetailScreen(blog: blog),
-    //   ),
-    // );
-
-    // For now, show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Đã chọn: ${blog['title'] ?? 'Blog'}'),
-        backgroundColor: const Color(0xFF1D7020),
-      ),
-    );
+    final blogId = blog['blogId'];
+    if (blogId != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => BlogDetailPopup(blogId: blogId),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Không thể tải chi tiết blog'),
+          backgroundColor: Colors.red.shade600,
+        ),
+      );
+    }
   }
 
   Widget _buildPaginationButton(int page, {bool isActive = false}) {

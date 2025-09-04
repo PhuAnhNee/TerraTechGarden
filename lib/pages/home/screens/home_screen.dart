@@ -109,7 +109,7 @@ class TerrariumCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '$minPrice – $maxPrice đ',
+                    '$minPrice — $maxPrice đ',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -209,7 +209,7 @@ class HomeScreen extends StatelessWidget {
           backgroundColor: const Color(0xFF1D7020),
           iconTheme: const IconThemeData(color: Colors.white),
           title: const Text(
-            'TerraTechGarden', // Replaced Image.asset with Text
+            'TerraTechGarden',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -237,6 +237,14 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          heroTag: "chat_fab",
+          onPressed: () {
+            Navigator.pushNamed(context, Routes.chat);
+          },
+          backgroundColor: const Color(0xFF1D7020),
+          child: const Icon(Icons.chat, color: Colors.white),
         ),
       ),
     );

@@ -54,7 +54,8 @@ class Transport {
               ? DateTime.parse(json['estimateCompletedDate'])
               : null),
       reason: json['reason'],
-      imagePath: json['imagePath'],
+      // Fix: Check for both 'image' and 'imagePath' fields
+      imagePath: json['image'] ?? json['imagePath'],
       assignToUserId: json['assignToUserId'],
       contactFailNumber: json['contactFailNumber'] ?? 0,
       note: json['note'],

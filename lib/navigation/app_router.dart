@@ -14,13 +14,17 @@ import '../pages/terrarium/screens/terrarium_screen.dart';
 import '../pages/terrarium-detail/screens/terrarium_detail_screen.dart';
 import '../pages/ship/home/screens/shipper_home_screen.dart';
 import '../pages/ship/home/bloc/ship_bloc.dart';
-import '../pages/ship/home/bloc/ship_event.dart';
 import '../pages/ship/delivery/screens/delivery_screen.dart';
 import '../pages/cart/screens/cart_screen.dart';
 import '../pages/cart/bloc/cart_bloc.dart';
 import '../pages/cart/bloc/cart_event.dart';
 import '../pages/notification/screens/notification_screen.dart';
 import '../pages/cart/widgets/checkout_screen.dart';
+import '../pages/chat/screens/chat_screen.dart';
+import '../pages/chat/bloc/chat_bloc.dart';
+import '../pages/order/screens/order_screen.dart';
+import '../pages/order/bloc/order_bloc.dart';
+import '../pages/order/bloc/order_event.dart';
 import 'routes.dart';
 import 'dart:developer' as developer;
 
@@ -77,8 +81,6 @@ Map<String, WidgetBuilder> getAppRoutes() {
         ),
       );
     },
-
-    // Fixed ShipBloc routing with proper provider
     Routes.shipHome: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
@@ -103,8 +105,6 @@ Map<String, WidgetBuilder> getAppRoutes() {
         child: ShipperHomeScreen(token: token),
       );
     },
-
-    // Deprecated route - redirects to new shipHome
     Routes.shipperHome: (context) {
       developer.log(
           'Using deprecated shipperHome route, redirecting to shipHome',
@@ -118,7 +118,6 @@ Map<String, WidgetBuilder> getAppRoutes() {
         ),
       );
     },
-
     Routes.delivery: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
@@ -142,7 +141,6 @@ Map<String, WidgetBuilder> getAppRoutes() {
         child: DeliveryScreen(),
       );
     },
-
     Routes.cart: (context) {
       final authBloc = context.read<AuthBloc>();
       final token = authBloc.token;
@@ -159,13 +157,39 @@ Map<String, WidgetBuilder> getAppRoutes() {
     Routes.notification: (context) => NotificationScreen(
           userId: ModalRoute.of(context)!.settings.arguments as String,
         ),
-    Routes.error: (context) => const Scaffold(
+    Routes.chat: (context) {
+      final authBloc = context.read<AuthBloc>();
+      final token = authBloc.token;
+      developer.log('ChatScreen token: $token', name: 'AppRouter');
+
+      return BlocProvider(
+        create: (context) => ChatBloc(storedToken: token),
+        child: ChatScreen(authToken: token),
+      );
+    },
+    Routes.order: (context) {
+      final authBloc = context.read<AuthBloc>();
+      final token = authBloc.token;
+      developer.log('OrderScreen token: $token', name: 'AppRouter');
+
+      // Check if token exists
+      if (token == null || token.isEmpty) {
+        developer.log('No token found for orders, redirecting to login',
+            name: 'AppRouter');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushReplacementNamed(Routes.login);
+        });
+        return const Scaffold(
           body: Center(
-            child: Text(
-              'Failed to initialize app. Please try again later.',
-              style: TextStyle(color: Colors.red, fontSize: 18),
-            ),
+            child: CircularProgressIndicator(),
           ),
-        ),
+        );
+      }
+
+      return BlocProvider(
+        create: (context) => OrderBloc(storedToken: token)..add(LoadOrders()),
+        child: const OrderScreen(),
+      );
+    },
   };
 }

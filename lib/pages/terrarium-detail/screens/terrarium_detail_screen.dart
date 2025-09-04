@@ -5,6 +5,9 @@ import 'package:share_plus/share_plus.dart';
 import '../bloc/terrarium_detail_bloc.dart';
 import '../bloc/terrarium_detail_event.dart';
 import '../bloc/terrarium_detail_state.dart';
+import '../../terrarium-variant/bloc/terrarium_variant_bloc.dart';
+import '../../terrarium-variant/bloc/terrarium_variant_event.dart';
+import '../../terrarium-variant/bloc/terrarium_variant_state.dart';
 import '../../cart/bloc/cart_bloc.dart';
 import '../../cart/bloc/cart_event.dart';
 import '../../../navigation/routes.dart';
@@ -14,6 +17,7 @@ import '../widgets/add_accessory_popup.dart';
 import '../widgets/terrarium_app_bar.dart';
 import '../widgets/terrarium_loading_state.dart';
 import '../widgets/terrarium_error_state.dart';
+import '../../terrarium-variant/widgets/terrarium_variant_selector.dart';
 import 'package:intl/intl.dart';
 
 class TerrariumDetailScreen extends StatefulWidget {
@@ -87,9 +91,17 @@ class _TerrariumDetailScreenState extends State<TerrariumDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) =>
-          TerrariumDetailBloc()..add(FetchTerrariumDetail(widget.terrariumId)),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => TerrariumDetailBloc()
+            ..add(FetchTerrariumDetail(widget.terrariumId)),
+        ),
+        BlocProvider(
+          create: (context) => TerrariumVariantBloc()
+            ..add(FetchTerrariumVariants(int.parse(widget.terrariumId))),
+        ),
+      ],
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
         body: BlocBuilder<TerrariumDetailBloc, TerrariumDetailState>(
@@ -110,16 +122,22 @@ class _TerrariumDetailScreenState extends State<TerrariumDetailScreen>
           },
         ),
         floatingActionButton:
-            BlocBuilder<TerrariumDetailBloc, TerrariumDetailState>(
-          builder: (context, state) {
-            if (state is TerrariumDetailLoaded) {
-              return TerrariumFloatingButtons(
-                terrarium: state.terrarium,
-                onAddToCart: () => _handleAddToCart(state.terrarium),
-                onBuyNow: () => _handleBuyNow(state.terrarium),
-              );
-            }
-            return const SizedBox();
+            BlocBuilder<TerrariumVariantBloc, TerrariumVariantState>(
+          builder: (context, variantState) {
+            return BlocBuilder<TerrariumDetailBloc, TerrariumDetailState>(
+              builder: (context, detailState) {
+                if (detailState is TerrariumDetailLoaded) {
+                  return TerrariumFloatingButtons(
+                    terrarium: detailState.terrarium,
+                    onAddToCart: () =>
+                        _handleAddToCart(detailState.terrarium, variantState),
+                    onBuyNow: () =>
+                        _handleBuyNow(detailState.terrarium, variantState),
+                  );
+                }
+                return const SizedBox();
+              },
+            );
           },
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -138,20 +156,47 @@ class _TerrariumDetailScreenState extends State<TerrariumDetailScreen>
           ),
         ];
       },
-      body: TerrariumContent(
-        terrarium: terrarium,
-        fadeAnimation: _fadeAnimation,
-        slideAnimation: _slideAnimation,
-        selectedImageIndex: _selectedImageIndex,
-        isFavorite: _isFavorite,
-        onImageSelected: _onImageSelected,
-        onFavoriteToggle: _onFavoriteToggle,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Original terrarium content
+            TerrariumContent(
+              terrarium: terrarium,
+              fadeAnimation: _fadeAnimation,
+              slideAnimation: _slideAnimation,
+              selectedImageIndex: _selectedImageIndex,
+              isFavorite: _isFavorite,
+              onImageSelected: _onImageSelected,
+              onFavoriteToggle: _onFavoriteToggle,
+            ),
+
+            // Variant selector
+            const TerrariumVariantSelector(),
+
+            // Add some bottom padding for the floating action button
+            const SizedBox(height: 100),
+          ],
+        ),
       ),
     );
   }
 
-  void _handleAddToCart(Map<String, dynamic> terrarium) {
-    final accessories = terrarium['accessories'] as List<dynamic>? ?? [];
+  void _handleAddToCart(
+      Map<String, dynamic> terrarium, TerrariumVariantState variantState) {
+    List<dynamic> accessories = [];
+
+    // Check if we have variants loaded and use selected variant's accessories
+    if (variantState is TerrariumVariantLoaded) {
+      final selectedVariant = variantState.selectedVariant;
+      accessories =
+          selectedVariant['terrariumVariantAccessories'] as List<dynamic>? ??
+              [];
+    } else {
+      // Fallback to original terrarium accessories
+      accessories = terrarium['accessories'] as List<dynamic>? ?? [];
+    }
 
     if (accessories.isEmpty) {
       _showNoAccessoriesMessage();
@@ -161,8 +206,20 @@ class _TerrariumDetailScreenState extends State<TerrariumDetailScreen>
     _showAddAccessoryPopup(terrarium, accessories, isAddToCart: true);
   }
 
-  void _handleBuyNow(Map<String, dynamic> terrarium) {
-    final accessories = terrarium['accessories'] as List<dynamic>? ?? [];
+  void _handleBuyNow(
+      Map<String, dynamic> terrarium, TerrariumVariantState variantState) {
+    List<dynamic> accessories = [];
+
+    // Check if we have variants loaded and use selected variant's accessories
+    if (variantState is TerrariumVariantLoaded) {
+      final selectedVariant = variantState.selectedVariant;
+      accessories =
+          selectedVariant['terrariumVariantAccessories'] as List<dynamic>? ??
+              [];
+    } else {
+      // Fallback to original terrarium accessories
+      accessories = terrarium['accessories'] as List<dynamic>? ?? [];
+    }
 
     if (accessories.isEmpty) {
       _showNoAccessoriesMessage();

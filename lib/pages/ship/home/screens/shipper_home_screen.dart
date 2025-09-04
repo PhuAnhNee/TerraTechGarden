@@ -6,6 +6,7 @@ import '../bloc/ship_bloc.dart';
 import '../bloc/ship_event.dart';
 import '../bloc/ship_state.dart';
 import '../widgets/transport_cart.dart';
+import '../../history/screens/transport_history.dart';
 
 class ShipperHomeScreen extends StatefulWidget {
   final String token;
@@ -24,6 +25,10 @@ class _HomeScreenState extends State<ShipperHomeScreen>
   late TabController _tabController;
   int _selectedIndex = 0;
 
+  // Cache the counts to persist across state changes
+  int _ordersCount = 0;
+  int _transportsCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -38,8 +43,9 @@ class _HomeScreenState extends State<ShipperHomeScreen>
   }
 
   void _loadInitialData() {
-    // Load available orders initially
+    // Load both orders and transports initially to populate stats cards
     context.read<ShipBloc>().add(LoadAvailableOrdersEvent(token: widget.token));
+    context.read<ShipBloc>().add(LoadTransportsEvent(token: widget.token));
   }
 
   @override
@@ -102,9 +108,32 @@ class _HomeScreenState extends State<ShipperHomeScreen>
           color: const Color(0xFF2a2a2a),
           itemBuilder: (context) => [
             PopupMenuItem(
+              value: 'history',
+              onTap: () {
+                // Navigate to transport history
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => ShipBloc(),
+                      child: TransportHistoryScreen(token: widget.token),
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.history, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text('Lịch sử vận chuyển',
+                      style: TextStyle(color: Colors.white)),
+                ],
+              ),
+            ),
+            PopupMenuItem(
               value: 'profile',
               onTap: () {
-                // Điều hướng về màn hình login
+                // Navigate to profile
                 Navigator.pushReplacementNamed(context, '/profile');
               },
               child: Row(
@@ -118,7 +147,7 @@ class _HomeScreenState extends State<ShipperHomeScreen>
             PopupMenuItem(
               value: 'logout',
               onTap: () {
-                // Điều hướng về màn hình login
+                // Navigate to login
                 Navigator.pushReplacementNamed(context, '/login');
               },
               child: Row(
@@ -220,35 +249,63 @@ class _HomeScreenState extends State<ShipperHomeScreen>
     );
   }
 
+  // Fixed _buildStatsCards method - always shows API data
   Widget _buildStatsCards() {
-    return BlocBuilder<ShipBloc, ShipState>(
-      builder: (context, state) {
-        return Container(
-          height: 120,
-          margin: EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  'Đơn hàng',
-                  '${_getTotalOrdersCount(state)}',
-                  Icons.shopping_cart,
-                  Colors.orange,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  'Vận đơn',
-                  '${_getTotalTransportsCount(state)}',
-                  Icons.local_shipping,
-                  Colors.blue,
-                ),
-              ),
-            ],
-          ),
-        );
+    return BlocListener<ShipBloc, ShipState>(
+      listener: (context, state) {
+        // Update cached counts when states change
+        if (state is OrdersLoaded) {
+          _ordersCount = state.orders.length;
+        }
+        if (state is TransportsLoaded) {
+          _transportsCount = state.transports.length;
+        } else if (state is TransportHistoryLoaded) {
+          _transportsCount = state.transports.length;
+        }
       },
+      child: BlocBuilder<ShipBloc, ShipState>(
+        builder: (context, state) {
+          // Use cached counts or current state counts
+          int currentOrdersCount = _ordersCount;
+          int currentTransportsCount = _transportsCount;
+
+          // Update from current state if available
+          if (state is OrdersLoaded) {
+            currentOrdersCount = state.orders.length;
+          }
+          if (state is TransportsLoaded) {
+            currentTransportsCount = state.transports.length;
+          } else if (state is TransportHistoryLoaded) {
+            currentTransportsCount = state.transports.length;
+          }
+
+          return Container(
+            height: 120,
+            margin: EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    'Đơn hàng',
+                    '$currentOrdersCount',
+                    Icons.shopping_cart,
+                    Colors.orange,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    'Vận đơn',
+                    '$currentTransportsCount',
+                    Icons.local_shipping,
+                    Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

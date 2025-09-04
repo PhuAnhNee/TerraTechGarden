@@ -15,3 +15,17 @@ class FetchAccessories extends AccessoryEvent {
   @override
   List<Object?> get props => [page];
 }
+
+class RefreshAccessories extends AccessoryEvent {
+  const RefreshAccessories();
+}
+
+class AddToCart extends AccessoryEvent {
+  final Map<String, dynamic> accessory;
+  final int quantity;
+
+  const AddToCart(this.accessory, {this.quantity = 1});
+
+  @override
+  List<Object?> get props => [accessory, quantity];
+}

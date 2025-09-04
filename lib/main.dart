@@ -13,6 +13,7 @@ import 'pages/ship/home/bloc/ship_bloc.dart'; // Updated import path
 import 'pages/notification/bloc/notification_bloc.dart';
 import 'pages/notification/widgets/notification_provider.dart';
 import 'core/utils/auth_utils.dart';
+import 'pages/order/bloc/order_bloc.dart';
 import 'core/utils/firebase_messaging_setup.dart';
 import 'core/utils/notification_navigator_observer.dart';
 
@@ -57,6 +58,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(
             create: (context) => ShipBloc()), // Updated to use ShipBloc
         BlocProvider(create: (context) => NotificationBloc()),
+        BlocProvider(create: (context) => OrderBloc(storedToken: storedToken)),
       ],
       child: Builder(
         builder: (context) {

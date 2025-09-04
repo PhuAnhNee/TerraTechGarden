@@ -3,13 +3,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:developer' as developer;
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import '../../../../models/transport.dart';
+import '../../../../models/address.dart';
 
 class DeliveryScreen extends StatefulWidget {
   final LatLng? destinationLatLng;
@@ -27,21 +29,79 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   LatLng? _finalDestinationLatLng;
   List<LatLng> polylineCoordinates = [];
   String? _errorMessage;
-  String? _completionImage;
-  final ImagePicker _imagePicker = ImagePicker();
   BitmapDescriptor? _shipperIcon;
 
-  // Receiver information
-  final String receiverName = "Hải";
-  final String receiverPhone = "0856686130";
-  final String receiverAddress =
-      "20D, Phường Long Thạnh Mỹ, Thành phố Thủ Đức, Thành phố Hồ Chí Minh";
+  // Dynamic receiver information - will be populated from API data
+  String receiverName = "Loading...";
+  String receiverPhone = "";
+  String receiverAddress = "Loading address...";
+  String transportId = "";
+  String estimatedDelivery = "";
+  Transport? transport;
+  Address? address;
 
   @override
   void initState() {
     super.initState();
+    _extractArgumentsFromRoute();
     _initializeDelivery();
     _loadCustomIcon();
+  }
+
+  void _extractArgumentsFromRoute() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final arguments =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+      if (arguments != null) {
+        transport = arguments['transport'] as Transport?;
+        address = arguments['address'] as Address?;
+
+        print('=== EXTRACTING API DATA ===');
+        print('Transport data: ${transport?.toJson()}');
+        print('Address data: ${address?.toJson()}');
+
+        // Use API data from address object
+        if (address != null) {
+          setState(() {
+            receiverName = address!.receiverName ?? "Unknown Receiver";
+            receiverPhone = address!.receiverPhone ?? "";
+            receiverAddress = address!.receiverAddress ?? "Unknown Address";
+          });
+
+          // Set destination coordinates from address
+          if (address!.latitude != null && address!.longitude != null) {
+            setState(() {
+              _finalDestinationLatLng =
+                  LatLng(address!.latitude!, address!.longitude!);
+            });
+            print('Using coordinates from address: $_finalDestinationLatLng');
+          }
+        }
+
+        // Use transport data for order information
+        if (transport != null) {
+          setState(() {
+            transportId = transport!.transportId.toString();
+            if (transport!.estimatedDelivery != null) {
+              estimatedDelivery =
+                  '${transport!.estimatedDelivery!.day}/${transport!.estimatedDelivery!.month}/${transport!.estimatedDelivery!.year}';
+            }
+          });
+        }
+
+        print('=== FINAL EXTRACTED DATA ===');
+        print('Receiver Name: $receiverName');
+        print('Receiver Phone: $receiverPhone');
+        print('Receiver Address: $receiverAddress');
+        print('Transport ID: $transportId');
+        print('Estimated Delivery: $estimatedDelivery');
+        print('Destination LatLng: $_finalDestinationLatLng');
+      } else {
+        print('=== NO ARGUMENTS FOUND ===');
+        _showErrorSnackBar('Không thể tải thông tin đơn hàng');
+      }
+    });
   }
 
   void _showErrorSnackBar(String message) {
@@ -84,7 +144,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     return bitmap;
   }
 
-  // Function to load custom motorcycle icon
   Future<void> _loadCustomIcon() async {
     try {
       final BitmapDescriptor icon = await _createMarkerIcon();
@@ -107,15 +166,29 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Future<void> _setDestinationCoordinates() async {
     print('=== SET DESTINATION START ===');
     print('Widget destination: ${widget.destinationLatLng}');
+    print(
+        'Address coordinates: lat=${address?.latitude}, lng=${address?.longitude}');
 
+    // Priority: widget parameter > address coordinates > geocoding
     if (widget.destinationLatLng != null) {
       setState(() {
         _finalDestinationLatLng = widget.destinationLatLng;
       });
-      print('Using destination from widget: $_finalDestinationLatLng');
-    } else {
-      print('No destination from widget, geocoding address...');
+      print('Using destination from widget parameter');
+    } else if (address?.latitude != null && address?.longitude != null) {
+      setState(() {
+        _finalDestinationLatLng =
+            LatLng(address!.latitude!, address!.longitude!);
+      });
+      print('Using coordinates from address object');
+    } else if (receiverAddress.isNotEmpty &&
+        receiverAddress != "Loading address...") {
+      print('No coordinates available, attempting geocoding...');
       await _geocodeAddress();
+    } else {
+      print('No address data available for geocoding');
+      _showErrorSnackBar('Không có thông tin địa chỉ');
+      return;
     }
 
     print('Final destination set to: $_finalDestinationLatLng');
@@ -134,14 +207,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Future<void> _geocodeAddress() async {
     print('=== GEOCODING START ===');
     try {
-      setState(() {
-        _finalDestinationLatLng = const LatLng(10.8411, 106.8066);
-      });
-      print(
-          'Using coordinates for Long Thanh My, Thu Duc: $_finalDestinationLatLng');
-
-      final encodedAddress =
-          Uri.encodeQueryComponent("Thu Duc City, Ho Chi Minh City, Vietnam");
+      final encodedAddress = Uri.encodeQueryComponent(receiverAddress);
       final url =
           'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddress&limit=1';
 
@@ -162,13 +228,17 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             _finalDestinationLatLng = LatLng(lat, lon);
           });
           print('Updated coordinates from geocoding: $_finalDestinationLatLng');
+        } else {
+          print('No geocoding results found');
+          _showErrorSnackBar('Không tìm thấy địa chỉ');
         }
+      } else {
+        print('Geocoding failed with status: ${response.statusCode}');
+        _showErrorSnackBar('Lỗi geocoding');
       }
     } catch (e) {
       print('Geocoding error: $e');
-      setState(() {
-        _finalDestinationLatLng = const LatLng(10.8411, 106.8066);
-      });
+      _showErrorSnackBar('Lỗi khi tìm địa chỉ');
     }
     print('=== GEOCODING END ===');
   }
@@ -227,7 +297,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     } catch (e) {
       print('Location error: $e');
       setState(() {
-        _currentLatLng = const LatLng(20.9373, 106.3277); // Hải Dương
+        _currentLatLng =
+            const LatLng(10.8411, 106.8066); // Ho Chi Minh City fallback
         _errorMessage = null;
       });
       print('Using fallback location: $_currentLatLng');
@@ -242,7 +313,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
     if (_currentLatLng == null || _finalDestinationLatLng == null) {
       print('Cannot draw route: missing coordinates');
-      print('Current: $_currentLatLng, Destination: $_finalDestinationLatLng');
       return;
     }
 
@@ -259,7 +329,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('OSRM decoded data: $data');
 
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final coordinates = data['routes'][0]['geometry']['coordinates']
@@ -268,7 +337,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               .toList();
 
           print('Route coordinates count: ${coordinates.length}');
-          print('First few coordinates: ${coordinates.take(3).toList()}');
 
           setState(() {
             polylineCoordinates = coordinates;
@@ -286,7 +354,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         }
       } else {
         setState(() {
-          _errorMessage = 'Lỗi OSRM: ${response.statusCode} - ${response.body}';
+          _errorMessage = 'Lỗi OSRM: ${response.statusCode}';
         });
         print('OSRM HTTP Error: ${response.statusCode}');
       }
@@ -327,79 +395,98 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     );
   }
 
-  // FIXED PHONE CALL METHOD
   Future<void> _makePhoneCall() async {
-    print('PHONE CALL DEBUG: Starting phone call process');
-
-    // Clean phone number - loại bỏ mọi ký tự không phải số
-    final String cleanPhone = receiverPhone.replaceAll(RegExp(r'[^\d]'), '');
-    print('PHONE CALL DEBUG: Original: $receiverPhone, Clean: $cleanPhone');
-
-    // Thử nhiều format khác nhau
-    final List<String> phoneFormats = [
-      'tel:$cleanPhone',
-      'tel:+84${cleanPhone.substring(1)}', // Convert to international
-      'tel://$cleanPhone',
-    ];
-
-    bool callSuccessful = false;
-
-    for (String phoneUri in phoneFormats) {
-      try {
-        print('PHONE CALL DEBUG: Trying $phoneUri');
-        final Uri uri = Uri.parse(phoneUri);
-
-        if (await canLaunchUrl(uri)) {
-          print('PHONE CALL DEBUG: Can launch $phoneUri');
-
-          final bool launched = await launchUrl(
-            uri,
-            mode: LaunchMode.externalApplication,
-          );
-
-          print('PHONE CALL DEBUG: Launch result for $phoneUri: $launched');
-
-          if (launched) {
-            callSuccessful = true;
-            break;
-          }
-        } else {
-          print('PHONE CALL DEBUG: Cannot launch $phoneUri');
-        }
-      } catch (e) {
-        print('PHONE CALL DEBUG: Error with $phoneUri: $e');
-      }
+    if (receiverPhone.isEmpty) {
+      _showCallFeedback('Không có số điện thoại', Colors.red);
+      return;
     }
 
-    if (!callSuccessful) {
-      print('PHONE CALL DEBUG: All methods failed, showing error');
-      _showErrorSnackBar(
-          'Không thể gọi điện. Kiểm tra:\n1. Permissions\n2. Ứng dụng điện thoại\n3. Test trên device thật');
+    final String cleanPhone = receiverPhone.replaceAll(RegExp(r'[^\d]'), '');
+    print('📞 Attempting to call: $cleanPhone');
+
+    try {
+      var phonePermission = await Permission.phone.status;
+      if (!phonePermission.isGranted) {
+        phonePermission = await Permission.phone.request();
+      }
+
+      final Uri phoneUri = Uri(scheme: 'tel', path: cleanPhone);
+
+      bool launched = await launchUrl(
+        phoneUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (launched) {
+        print('📞 ✅ Phone call launched successfully!');
+        _showCallFeedback('Đang thực hiện cuộc gọi...', Colors.green);
+        return;
+      }
+
+      launched = await launchUrl(
+        Uri.parse('tel:$cleanPhone'),
+        mode: LaunchMode.externalNonBrowserApplication,
+      );
+
+      if (launched) {
+        print('📞 ✅ External phone call successful!');
+        _showCallFeedback('Đang thực hiện cuộc gọi...', Colors.green);
+        return;
+      }
+
+      if (Platform.isAndroid) {
+        launched = await launchUrl(
+          Uri.parse('tel:$cleanPhone'),
+          mode: LaunchMode.platformDefault,
+        );
+
+        if (launched) {
+          print('📞 ✅ Platform default call successful!');
+          _showCallFeedback('Đang thực hiện cuộc gọi...', Colors.green);
+          return;
+        }
+      }
+
+      launched = await launchUrl(
+        Uri.parse('tel://$cleanPhone'),
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (launched) {
+        print('📞 ✅ Alternative URI format successful!');
+        _showCallFeedback('Đang thực hiện cuộc gọi...', Colors.green);
+        return;
+      }
+
+      throw Exception('All launch methods failed');
+    } catch (e) {
+      print('📞 ❌ All phone call methods failed: $e');
+      _showCallFeedback('Không thể thực hiện cuộc gọi', Colors.red);
     }
   }
 
-  // BUILD ENHANCED PHONE BUTTON
-  Widget _buildEnhancedPhoneButton() {
+  void _showCallFeedback(String message, Color color) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: color,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Widget _buildPhoneButton() {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(25),
-        onTap: () {
-          print('PHONE BUTTON DEBUG: Button tapped!');
-
-          // Show immediate feedback
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Đang thực hiện cuộc gọi...'),
-              duration: Duration(seconds: 1),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          // Delay slightly then make call
-          Future.delayed(Duration(milliseconds: 500), () {
-            _makePhoneCall();
-          });
+        onTap: () async {
+          print('📞 PHONE BUTTON: Tapped!');
+          _showCallFeedback('Đang chuẩn bị cuộc gọi...', Colors.blue);
+          await Future.delayed(const Duration(milliseconds: 200));
+          await _makePhoneCall();
         },
         child: Container(
           width: 45,
@@ -426,169 +513,37 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     );
   }
 
-  Future<void> _pickCompletionImage() async {
-    try {
-      final ImageSource? source = await showDialog<ImageSource>(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF2a2a2a),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Chọn ảnh hoàn thành',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.white),
-                title: const Text(
-                  'Chụp ảnh mới',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.white),
-                title: const Text(
-                  'Chọn từ thư viện',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-            ),
-          ],
-        ),
-      );
-
-      if (source != null) {
-        final XFile? pickedFile = await _imagePicker.pickImage(
-          source: source,
-          imageQuality: 80,
-          maxWidth: 1920,
-          maxHeight: 1080,
-        );
-
-        if (pickedFile != null) {
-          setState(() {
-            _completionImage = pickedFile.path;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ảnh hoàn thành đã được chọn!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      developer.log('Image picker error: $e', name: 'DeliveryScreen');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi chọn ảnh: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showCompletionDialog() {
-    if (_completionImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn ảnh xác nhận hoàn thành trước!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2a2a2a),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Xác nhận hoàn thành',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Xác nhận đơn hàng đã được giao thành công?',
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 12),
-            if (_completionImage != null)
-              Container(
-                height: 150,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(_completionImage!),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _completeDelivery();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child:
-                const Text('Xác nhận', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _completeDelivery() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Giao hàng thành công! Đang cập nhật trạng thái...'),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    Navigator.pop(context, {
-      'completed': true,
-      'completionImage': _completionImage,
-      'completionTime': DateTime.now().toIso8601String(),
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
       body: _errorMessage != null
           ? Center(
-              child: Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.white),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _errorMessage = null;
+                      });
+                      _initializeDelivery();
+                    },
+                    child: Text('Thử lại'),
+                  ),
+                ],
               ),
             )
           : _currentLatLng == null
@@ -712,6 +667,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         ]
                       ''',
                     ),
+                    // Back button
                     Positioned(
                       top: MediaQuery.of(context).padding.top + 10,
                       left: 20,
@@ -732,6 +688,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         ),
                       ),
                     ),
+                    // Status bar
                     Positioned(
                       top: MediaQuery.of(context).padding.top + 10,
                       left: 80,
@@ -780,6 +737,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         ),
                       ),
                     ),
+                    // Bottom info panel
                     Positioned(
                       bottom: 0,
                       left: 0,
@@ -795,6 +753,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Customer info
                             Container(
                               margin: const EdgeInsets.all(16),
                               padding: const EdgeInsets.all(16),
@@ -845,14 +804,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  // ENHANCED PHONE BUTTON
-                                  _buildEnhancedPhoneButton(),
+                                  _buildPhoneButton(),
                                 ],
                               ),
                             ),
+                            // Order info
                             Container(
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 16),
+                              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2A2A2A),
@@ -864,9 +822,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text(
-                                        'Mã đơn hàng: #JA447FB549',
-                                        style: TextStyle(
+                                      Text(
+                                        transport != null
+                                            ? 'Mã đơn hàng: #${transport!.transportId}'
+                                            : 'Mã đơn hàng: #JA447FB549',
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
@@ -903,9 +863,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                                           fontSize: 14,
                                         ),
                                       ),
-                                      const Text(
-                                        '23 August 25',
-                                        style: TextStyle(
+                                      Text(
+                                        transport?.estimatedDelivery != null
+                                            ? '${transport!.estimatedDelivery!.day}/${transport!.estimatedDelivery!.month}/${transport!.estimatedDelivery!.year}'
+                                            : '27 August 2025',
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
@@ -913,77 +875,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              margin: const EdgeInsets.all(16),
-                              child: Column(
-                                children: [
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed: _pickCompletionImage,
-                                      icon: const Icon(Icons.photo,
-                                          color: Colors.white),
-                                      label: Text(
-                                        _completionImage != null
-                                            ? 'Chọn lại ảnh hoàn thành'
-                                            : 'Chọn ảnh hoàn thành',
-                                        style: const TextStyle(
-                                            color: Colors.white),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (_completionImage != null) ...[
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      height: 100,
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.green),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(
-                                          File(_completionImage!),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton.icon(
-                                        onPressed: _showCompletionDialog,
-                                        icon: const Icon(Icons.check_circle,
-                                            color: Colors.white),
-                                        label: const Text(
-                                          'Xác nhận hoàn thành giao hàng',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),

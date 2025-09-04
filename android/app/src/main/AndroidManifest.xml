@@ -1,9 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.terratechgarden">
 
-    <!-- Bổ sung quyền vị trí -->
+    <!-- Quyền vị trí -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    
+    <!-- Quyền gọi điện - THÊM DÒNG NÀY -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
 
     <application
         android:label="terratechgarden"
@@ -41,7 +44,27 @@
 
     </application>
 
+    <!-- Queries - CẤU HÌNH ĐẦY ĐỦ CHO PHONE CALLS -->
     <queries>
+        <!-- Query cho DIAL intent -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        
+        <!-- Query cho CALL intent -->
+        <intent>
+            <action android:name="android.intent.action.CALL" />
+            <data android:scheme="tel" />
+        </intent>
+        
+        <!-- Query cho VIEW intent với tel scheme -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tel" />
+        </intent>
+        
+        <!-- Query cho process text (giữ lại cái cũ) -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

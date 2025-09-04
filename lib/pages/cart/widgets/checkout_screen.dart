@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'address.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final double totalAmount;
@@ -11,10 +12,11 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final TextEditingController _addressController = TextEditingController();
   final TextEditingController _voucherController = TextEditingController();
-  bool _isAddressValid = false;
   double _discountAmount = 0.0;
+  Address? _selectedAddress;
+  List<Address> _addresses = [];
+  bool _isLoadingAddresses = true;
 
   String _formatCurrency(double amount) {
     final formatter = NumberFormat('#,###', 'vi_VN');
@@ -22,15 +24,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   double get _finalAmount => widget.totalAmount - _discountAmount;
+  bool get _canProceedToPayment => _selectedAddress != null;
 
   @override
   void initState() {
     super.initState();
-    _addressController.addListener(() {
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    setState(() => _isLoadingAddresses = true);
+
+    try {
+      final addresses = await AddressService.getAddresses();
       setState(() {
-        _isAddressValid = _addressController.text.trim().isNotEmpty;
+        _addresses = addresses;
+        // Auto-select default address if available
+        _selectedAddress = addresses.firstWhere(
+          (addr) => addr.isDefault,
+        );
       });
-    });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể tải danh sách địa chỉ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoadingAddresses = false);
+    }
+  }
+
+  void _showAddressSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AddressSelectionDialog(
+        addresses: _addresses,
+        selectedAddress: _selectedAddress,
+        onAddressSelected: (address) {
+          setState(() {
+            _selectedAddress = address;
+          });
+        },
+        onAddressAdded: (address) {
+          setState(() {
+            _addresses.add(address);
+            _selectedAddress = address; // Auto-select newly added address
+          });
+        },
+      ),
+    );
   }
 
   void _applyVoucher() {
@@ -69,8 +113,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showCheckoutDialog() {
-    if (!_isAddressValid) {
-      _showSnackBar('Vui lòng nhập địa chỉ giao hàng', Colors.red);
+    if (!_canProceedToPayment) {
+      _showSnackBar('Vui lòng chọn địa chỉ giao hàng', Colors.red);
       return;
     }
 
@@ -120,6 +164,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+
+                // Delivery Address Info
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Địa chỉ giao hàng:',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _selectedAddress!.receiverName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(_selectedAddress!.receiverPhone),
+                      Text(_selectedAddress!.receiverAddress),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Order Summary
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -595,41 +675,161 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'Địa chỉ giao hàng',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      const Expanded(
+                        child: Text(
+                          'Địa chỉ giao hàng',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const Text(
                         ' *',
                         style: TextStyle(color: Colors.red, fontSize: 18),
                       ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: _showAddressSelectionDialog,
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: Text(
+                            _selectedAddress == null ? 'Chọn' : 'Thay đổi'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF1D7020),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: _addressController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Ví dụ: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
-                      hintStyle: TextStyle(color: Colors.grey.shade400),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                  if (_isLoadingAddresses)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF1D7020),
+                        ),
                       ),
-                      focusedBorder: OutlineInputBorder(
+                    )
+                  else if (_selectedAddress == null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: Color(0xFF1D7020), width: 2),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
-                      contentPadding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.location_off,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Chưa chọn địa chỉ giao hàng',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: _showAddressSelectionDialog,
+                            icon: const Icon(Icons.add_location_alt),
+                            label: const Text('Chọn địa chỉ'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1D7020),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1D7020).withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: const Color(0xFF1D7020).withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                _selectedAddress!.receiverName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (_selectedAddress!.tagName != null &&
+                                  _selectedAddress!.tagName!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1D7020)
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    _selectedAddress!.tagName!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF1D7020),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (_selectedAddress!.isDefault) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Mặc định',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _selectedAddress!.receiverPhone,
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _selectedAddress!.receiverAddress,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -725,6 +925,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 30),
 
             const SizedBox(height: 30),
 

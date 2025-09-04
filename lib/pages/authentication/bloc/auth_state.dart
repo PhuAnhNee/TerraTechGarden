@@ -12,12 +12,13 @@ class AuthUnauthenticated extends AuthState {}
 class AuthLoading extends AuthState {}
 
 class AuthSuccess extends AuthState {
-  final String? role; // Added role field
+  final String? role;
+  final String? token; // Thêm token vào đây
 
-  const AuthSuccess({this.role});
+  const AuthSuccess({this.role, this.token});
 
   @override
-  List<Object?> get props => [role];
+  List<Object?> get props => [role, token];
 }
 
 class AuthFailure extends AuthState {

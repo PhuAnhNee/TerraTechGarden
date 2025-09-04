@@ -4,39 +4,61 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:developer' as developer;
 import 'dart:convert';
 
-// Import this in your checkout_screen.dart:
-// import 'address.dart';
-
 class Address {
-  final int? id;
+  final int? addressId;
+  final String? tagName;
   final String receiverName;
   final String receiverPhone;
   final String receiverAddress;
+  final String? provinceCode;
+  final String? districtCode;
+  final String? wardCode;
+  final String? latitude;
+  final String? longitude;
   final bool isDefault;
 
   Address({
-    this.id,
+    this.addressId,
+    this.tagName,
     required this.receiverName,
     required this.receiverPhone,
     required this.receiverAddress,
+    this.provinceCode,
+    this.districtCode,
+    this.wardCode,
+    this.latitude,
+    this.longitude,
     this.isDefault = false,
   });
 
   factory Address.fromJson(Map<String, dynamic> json) {
     return Address(
-      id: json['id'],
+      addressId: json['id'] ?? json['addressId'],
+      tagName: json['tagName'],
       receiverName: json['receiverName'] ?? '',
       receiverPhone: json['receiverPhone'] ?? '',
       receiverAddress: json['receiverAddress'] ?? '',
+      provinceCode: json['provinceCode'],
+      districtCode: json['districtCode'],
+      wardCode: json['wardCode'],
+      latitude: json['latitude']?.toString(),
+      longitude: json['longitude']?.toString(),
       isDefault: json['isDefault'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'tagName': tagName ?? 'Default',
       'receiverName': receiverName,
       'receiverPhone': receiverPhone,
       'receiverAddress': receiverAddress,
+      'provinceCode': provinceCode ?? '',
+      'districtCode': districtCode ?? '',
+      'wardCode': wardCode ?? '',
+      'latitude': latitude ?? '',
+      'longitude': longitude ?? '',
+      'isDefault': isDefault,
     };
   }
 
@@ -48,8 +70,7 @@ class Address {
 
 class AddressService {
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
-  static const String baseUrl =
-      'https://terarium.shop'; // Change this URL as needed
+  static const String baseUrl = 'https://terarium.shop';
 
   static Future<String?> _getUserIdFromToken() async {
     try {
@@ -59,16 +80,13 @@ class AddressService {
         return null;
       }
 
-      // Decode JWT token to extract user ID
       final parts = token.split('.');
       if (parts.length != 3) {
         developer.log('❌ Invalid JWT token format', name: 'AddressService');
         return null;
       }
 
-      // Decode the payload (middle part)
       final payload = parts[1];
-      // Add padding if necessary
       String normalizedPayload = payload;
       switch (payload.length % 4) {
         case 1:
@@ -112,22 +130,29 @@ class AddressService {
 
     dio.options.headers['Content-Type'] = 'application/json';
     dio.options.headers['Accept'] = '*/*';
+    dio.options.connectTimeout = const Duration(seconds: 30);
+    dio.options.receiveTimeout = const Duration(seconds: 30);
 
-    // Add interceptor for logging
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         developer.log('🚀 ADDRESS REQUEST: ${options.method} ${options.path}',
+            name: 'AddressService');
+        developer.log('📋 REQUEST DATA: ${options.data}',
             name: 'AddressService');
         handler.next(options);
       },
       onResponse: (response, handler) {
         developer.log('✅ ADDRESS RESPONSE: ${response.statusCode}',
             name: 'AddressService');
+        developer.log('📋 RESPONSE DATA: ${response.data}',
+            name: 'AddressService');
         handler.next(response);
       },
       onError: (error, handler) {
         developer.log(
             '❌ ADDRESS ERROR: ${error.response?.statusCode} ${error.message}',
+            name: 'AddressService');
+        developer.log('📋 ERROR DATA: ${error.response?.data}',
             name: 'AddressService');
         handler.next(error);
       },
@@ -136,7 +161,7 @@ class AddressService {
     return dio;
   }
 
-  static Future<bool> addAddress(Address address) async {
+  static Future<Map<String, dynamic>> addAddress(Address address) async {
     try {
       final dio = await _getDio();
       final response = await dio.post(
@@ -144,23 +169,63 @@ class AddressService {
         data: address.toJson(),
       );
 
+      developer.log('📋 Add address response: ${response.data}',
+          name: 'AddressService');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        developer.log('✅ Address added successfully', name: 'AddressService');
-        return true;
-      } else {
-        developer.log('❌ Failed to add address: ${response.statusCode}',
-            name: 'AddressService');
-        return false;
+        final responseData = response.data;
+
+        if (responseData is Map<String, dynamic>) {
+          final status = responseData['status'];
+          final message = responseData['message'];
+
+          if (status == 200 || status == 201) {
+            developer.log('✅ Address added successfully',
+                name: 'AddressService');
+            return {
+              'success': true,
+              'message': message ?? 'Address added successfully',
+              'data': responseData['data']
+            };
+          } else {
+            developer.log('❌ API returned error status: $status',
+                name: 'AddressService');
+            return {
+              'success': false,
+              'message': message ?? 'Failed to add address'
+            };
+          }
+        }
       }
+
+      return {
+        'success': false,
+        'message': 'Failed to add address: ${response.statusCode}'
+      };
     } catch (e) {
       developer.log('💥 Error adding address: $e', name: 'AddressService');
-      return false;
+
+      if (e is DioException) {
+        String errorMessage = 'Network error occurred';
+
+        if (e.response?.statusCode == 401) {
+          errorMessage = 'Authentication failed. Please log in again.';
+        } else if (e.response?.data != null &&
+            e.response!.data is Map<String, dynamic>) {
+          errorMessage = e.response!.data['message'] ?? errorMessage;
+        } else if (e.message != null) {
+          errorMessage = e.message!;
+        }
+
+        return {'success': false, 'message': errorMessage};
+      }
+
+      return {'success': false, 'message': 'Failed to add address: $e'};
     }
   }
 
   static Future<List<Address>> getAddresses() async {
     try {
-      // Get user ID from JWT token
       final userId = await _getUserIdFromToken();
       if (userId == null) {
         developer.log('❌ Cannot get addresses: No user ID found',
@@ -173,33 +238,25 @@ class AddressService {
         '$baseUrl/api/Address/getall-by-user-id/$userId',
       );
 
-      developer.log('📋 Address response status: ${response.statusCode}',
+      developer.log('📋 Get addresses response status: ${response.statusCode}',
           name: 'AddressService');
-      developer.log('📋 Address response data: ${response.data}',
+      developer.log('📋 Get addresses response data: ${response.data}',
           name: 'AddressService');
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        // Handle different response formats
         List<dynamic> addressList = [];
 
         if (data is Map<String, dynamic>) {
-          // If response has status and data fields
           if (data.containsKey('status') && data['status'] == 200) {
             addressList = data['data'] as List<dynamic>? ?? [];
-          }
-          // If response has items or addresses field
-          else if (data.containsKey('data')) {
+          } else if (data.containsKey('data')) {
             addressList = data['data'] as List<dynamic>? ?? [];
-          }
-          // If the response itself contains address fields directly
-          else if (data.containsKey('addresses')) {
+          } else if (data.containsKey('addresses')) {
             addressList = data['addresses'] as List<dynamic>? ?? [];
           }
-        }
-        // If response is directly a list
-        else if (data is List<dynamic>) {
+        } else if (data is List<dynamic>) {
           addressList = data;
         }
 
@@ -243,14 +300,17 @@ class AddAddressDialog extends StatefulWidget {
 }
 
 class _AddAddressDialogState extends State<AddAddressDialog> {
+  final TextEditingController _tagController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _isDefault = false;
 
   @override
   void dispose() {
+    _tagController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -263,28 +323,39 @@ class _AddAddressDialogState extends State<AddAddressDialog> {
     setState(() => _isLoading = true);
 
     final address = Address(
+      tagName: _tagController.text.trim().isNotEmpty
+          ? _tagController.text.trim()
+          : 'Default',
       receiverName: _nameController.text.trim(),
       receiverPhone: _phoneController.text.trim(),
       receiverAddress: _addressController.text.trim(),
+      isDefault: _isDefault,
     );
 
-    final success = await AddressService.addAddress(address);
+    final result = await AddressService.addAddress(address);
 
     setState(() => _isLoading = false);
 
-    if (success) {
-      widget.onAddressAdded(address);
+    if (result['success'] == true) {
+      // Create address object with returned data if available
+      Address createdAddress = address;
+      if (result['data'] != null && result['data'] is Map<String, dynamic>) {
+        createdAddress = Address.fromJson(result['data']);
+      }
+
+      widget.onAddressAdded(createdAddress);
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Thêm địa chỉ thành công!'),
+        SnackBar(
+          content: Text(result['message'] ?? 'Thêm địa chỉ thành công!'),
           backgroundColor: Colors.green,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không thể thêm địa chỉ. Vui lòng thử lại!'),
+        SnackBar(
+          content: Text(
+              result['message'] ?? 'Không thể thêm địa chỉ. Vui lòng thử lại!'),
           backgroundColor: Colors.red,
         ),
       );
@@ -296,6 +367,7 @@ class _AddAddressDialogState extends State<AddAddressDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
+        constraints: const BoxConstraints(maxHeight: 600),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -334,6 +406,26 @@ class _AddAddressDialogState extends State<AddAddressDialog> {
                   ],
                 ),
                 const SizedBox(height: 24),
+
+                // Tag Name (Optional)
+                TextFormField(
+                  controller: _tagController,
+                  decoration: InputDecoration(
+                    labelText: 'Tên địa chỉ (tùy chọn)',
+                    hintText: 'VD: Nhà riêng, Văn phòng...',
+                    prefixIcon:
+                        const Icon(Icons.label, color: Color(0xFF1D7020)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF1D7020), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                 // Receiver Name
                 TextFormField(
@@ -420,6 +512,23 @@ class _AddAddressDialogState extends State<AddAddressDialog> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // Is Default checkbox
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _isDefault,
+                      onChanged: (value) {
+                        setState(() {
+                          _isDefault = value ?? false;
+                        });
+                      },
+                      activeColor: const Color(0xFF1D7020),
+                    ),
+                    const Text('Đặt làm địa chỉ mặc định'),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
@@ -612,7 +721,8 @@ class _AddressSelectionDialogState extends State<AddressSelectionDialog> {
                       itemCount: _addresses.length,
                       itemBuilder: (context, index) {
                         final address = _addresses[index];
-                        final isSelected = _selectedAddress == address;
+                        final isSelected =
+                            _selectedAddress?.addressId == address.addressId;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -637,12 +747,56 @@ class _AddressSelectionDialogState extends State<AddressSelectionDialog> {
                                 _selectedAddress = value;
                               });
                             },
-                            title: Text(
-                              address.receiverName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  address.receiverName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                if (address.tagName != null &&
+                                    address.tagName!.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1D7020)
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      address.tagName!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF1D7020),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                if (address.isDefault) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'Mặc định',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,

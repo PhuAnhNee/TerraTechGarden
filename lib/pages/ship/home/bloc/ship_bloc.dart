@@ -18,6 +18,7 @@ class ShipBloc extends Bloc<ShipEvent, ShipState> {
   ShipBloc() : super(ShipInitial()) {
     on<LoadAvailableOrdersEvent>(_onLoadAvailableOrders);
     on<LoadShippingOrdersEvent>(_onLoadShippingOrders);
+    on<LoadTransportHistoryEvent>(_onLoadTransportHistory);
     on<LoadTransportsEvent>(_onLoadTransports);
     on<CreateTransportEvent>(_onCreateTransport);
     on<LoadAddressDetailsEvent>(_onLoadAddressDetails);
@@ -47,7 +48,7 @@ class ShipBloc extends Bloc<ShipEvent, ShipState> {
         final filteredOrders = ordersData
             .map((orderJson) => Order.fromJson(orderJson))
             .where((order) =>
-                order.status == 'processing' && order.paymentStatus == 'Paid')
+                order.status == 'Processing' && order.paymentStatus == 'Paid')
             .toList();
 
         // Load address details for each order
@@ -325,22 +326,123 @@ class ShipBloc extends Bloc<ShipEvent, ShipState> {
     }
   }
 
+// Add this method to ShipBloc constructor
+
+// Add this method to ShipBloc class
+  Future<void> _onLoadTransportHistory(
+      LoadTransportHistoryEvent event, Emitter<ShipState> emit) async {
+    emit(ShipLoading());
+    try {
+      final response = await _dio.get(
+        TerraApi.getAllTransports(),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${event.token}',
+            'accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        final transportsData = responseData['data'] as List? ?? [];
+        final transports = <Transport>[];
+        final Map<int, Address> addresses = {};
+
+        for (var transportJson in transportsData) {
+          final transport = Transport.fromJson(transportJson);
+
+          // Only include completed and failed transports
+          if (transport.status == 'completed' || transport.status == 'failed') {
+            // Fetch order details to get addressId
+            try {
+              final orderResponse = await _dio.get(
+                TerraApi.getOrder(transport.orderId),
+                options: Options(
+                  headers: {
+                    'Authorization': 'Bearer ${event.token}',
+                    'accept': '*/*',
+                  },
+                ),
+              );
+
+              if (orderResponse.statusCode == 200 &&
+                  orderResponse.data['status'] == 200) {
+                final orderData = orderResponse.data['data'];
+                final order = Order.fromJson(orderData);
+
+                // Fetch address details
+                final addressResponse = await _dio.get(
+                  TerraApi.getAddress(order.addressId),
+                  options: Options(
+                    headers: {
+                      'Authorization': 'Bearer ${event.token}',
+                      'accept': '*/*',
+                    },
+                  ),
+                );
+
+                if (addressResponse.statusCode == 200 &&
+                    addressResponse.data['status'] == 200) {
+                  final addressData = addressResponse.data['data'];
+                  final address = Address.fromJson(addressData);
+                  addresses[transport.orderId] = address;
+                }
+              }
+
+              transports.add(transport);
+            } catch (e) {
+              print('Error loading order ${transport.orderId}: $e');
+              // Still add transport even if we can't get address
+              transports.add(transport);
+            }
+          }
+        }
+
+        // Sort by created date (newest first), handle nullable DateTime
+        transports.sort((a, b) {
+          final dateA = a.createdDate ?? a.createdAt ?? DateTime.now();
+          final dateB = b.createdDate ?? b.createdAt ?? DateTime.now();
+          return dateB.compareTo(dateA);
+        });
+
+        emit(TransportHistoryLoaded(
+            transports: transports, addresses: addresses));
+      } else {
+        emit(ShipError(
+            'Failed to load transport history: ${response.data['message'] ?? 'Unknown error'}'));
+      }
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          emit(ShipError('Unauthorized. Please login again.'));
+        } else {
+          emit(ShipError('Network error: ${e.message}'));
+        }
+      } else {
+        emit(ShipError('Failed to load transport history: $e'));
+      }
+    }
+  }
+  // Updated _onUpdateTransportStatus method in ship_bloc.dart
+
   Future<void> _onUpdateTransportStatus(
       UpdateTransportStatusEvent event, Emitter<ShipState> emit) async {
     try {
       FormData formData = FormData();
 
-      // Add transport status update fields
+      // Add required transport status update fields
       formData.fields.addAll([
-        MapEntry('transportId', event.transportId.toString()),
-        MapEntry('status', event.status),
-        MapEntry('contactFailNumber', event.contactFailNumber ?? '0706801385'),
-        MapEntry('assignToUserId', event.assignToUserId?.toString() ?? ''),
+        MapEntry('TransportId', event.transportId.toString()),
+        MapEntry('Status', event.status),
+        MapEntry('ContactFailNumber',
+            event.contactFailNumber ?? '0'), // Changed to string as API expects
+        MapEntry('AssignToUserId', event.assignToUserId?.toString() ?? ''),
       ]);
 
       // Add reason if provided
       if (event.reason != null && event.reason!.isNotEmpty) {
-        formData.fields.add(MapEntry('reason', event.reason!));
+        formData.fields.add(MapEntry('Reason', event.reason!));
       }
 
       // Add image file if provided
@@ -348,7 +450,7 @@ class ShipBloc extends Bloc<ShipEvent, ShipState> {
         final file = File(event.imagePath!);
         if (await file.exists()) {
           formData.files.add(MapEntry(
-            'image',
+            'Image', // Changed to match API parameter name
             await MultipartFile.fromFile(
               event.imagePath!,
               filename: 'transport_${event.transportId}_${event.status}.jpg',
@@ -365,14 +467,20 @@ class ShipBloc extends Bloc<ShipEvent, ShipState> {
           headers: {
             'Authorization': 'Bearer ${event.token}',
             'accept': '*/*',
+            'Content-Type':
+                'multipart/form-data', // Added explicit content type
           },
         ),
       );
 
       if (response.statusCode == 200 &&
-          (response.data['status'] == 200 || response.data['status'] == 1)) {
+          (response.data['status'] == 200 || response.data['status'] == 201)) {
+        // Added 201 status
         final updatedTransport = Transport.fromJson(response.data['data']);
         emit(TransportUpdated(transport: updatedTransport));
+
+        // Reload transports after successful update
+        add(LoadTransportsEvent(token: event.token));
       } else {
         emit(ShipError(
             'Failed to update transport status: ${response.data['message'] ?? 'Unknown error'}'));
@@ -384,6 +492,8 @@ class ShipBloc extends Bloc<ShipEvent, ShipState> {
         } else if (e.response?.statusCode == 404) {
           emit(ShipError('Transport not found.'));
         } else {
+          // Log the actual error response for debugging
+          print('Update transport error: ${e.response?.data}');
           emit(ShipError('Network error: ${e.message}'));
         }
       } else {

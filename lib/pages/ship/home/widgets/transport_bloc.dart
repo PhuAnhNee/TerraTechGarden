@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
 import '../../../../models/transport.dart';
 import '../../../../models/address.dart';
@@ -302,7 +303,388 @@ class _TransportCardState extends State<TransportCard>
     );
   }
 
+  Future<void> _showDeliveryStatusDialog(BuildContext context) async {
+    final ImagePicker picker = ImagePicker();
+    String? selectedStatus;
+    String? selectedReason;
+    XFile? pickedImage;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: Color(0xFF1A1A1A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Text(
+                'Cập nhật trạng thái đơn hàng #${widget.transport.transportId}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Chọn trạng thái
+                    Text(
+                      'Chọn trạng thái:',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2A2A2A),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        value: selectedStatus,
+                        hint: Text(
+                          'Chọn trạng thái',
+                          style: TextStyle(color: Colors.grey.shade400),
+                        ),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                        dropdownColor: Color(0xFF2A2A2A),
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: 'completed',
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle,
+                                    color: Colors.green, size: 16),
+                                SizedBox(width: 8),
+                                Text('Hoàn thành',
+                                    style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'failed',
+                            child: Row(
+                              children: [
+                                Icon(Icons.cancel, color: Colors.red, size: 16),
+                                SizedBox(width: 8),
+                                Text('Hủy đơn',
+                                    style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            selectedStatus = newValue;
+                            selectedReason =
+                                null; // Reset reason when status changes
+                          });
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 16),
+
+                    // Chọn lý do (hiển thị khác nhau tùy theo trạng thái)
+                    if (selectedStatus != null) ...[
+                      Text(
+                        'Chọn lý do:',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Color(0xFF2A2A2A),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: selectedReason,
+                          hint: Text(
+                            'Chọn lý do',
+                            style: TextStyle(color: Colors.grey.shade400),
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          dropdownColor: Color(0xFF2A2A2A),
+                          items: _getReasonsByStatus(selectedStatus!)
+                              .map((String reason) {
+                            return DropdownMenuItem<String>(
+                              value: reason,
+                              child: Text(
+                                reason,
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              selectedReason = newValue;
+                            });
+                          },
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+
+                    // Chọn ảnh
+                    if (selectedStatus != null) ...[
+                      Text(
+                        'Chọn hình ảnh:',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final XFile? image = await picker.pickImage(
+                                  source: ImageSource.camera,
+                                  imageQuality: 80,
+                                );
+                                if (image != null) {
+                                  setState(() {
+                                    pickedImage = image;
+                                  });
+                                }
+                              },
+                              icon: Icon(Icons.camera_alt, size: 16),
+                              label: Text('Chụp ảnh'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final XFile? image = await picker.pickImage(
+                                  source: ImageSource.gallery,
+                                  imageQuality: 80,
+                                );
+                                if (image != null) {
+                                  setState(() {
+                                    pickedImage = image;
+                                  });
+                                }
+                              },
+                              icon: Icon(Icons.photo, size: 16),
+                              label: Text('Chọn ảnh'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    // Hiển thị ảnh đã chọn
+                    if (pickedImage != null) ...[
+                      SizedBox(height: 12),
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Ảnh đã chọn: ${pickedImage!.name}',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // Cảnh báo
+                    if (selectedStatus != null) ...[
+                      SizedBox(height: 12),
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.warning,
+                              color: Colors.orange,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Hành động này không thể hoàn tác.',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                          'Hủy',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: selectedStatus != null &&
+                                selectedReason != null &&
+                                pickedImage != null
+                            ? () {
+                                context.read<ShipBloc>().add(
+                                      UpdateTransportStatusEvent(
+                                        transportId:
+                                            widget.transport.transportId,
+                                        status: selectedStatus!,
+                                        token: widget.token,
+                                        reason: selectedReason!,
+                                        imagePath: pickedImage!.path,
+                                        contactFailNumber: '0706801385',
+                                        assignToUserId: widget.transport.userId,
+                                      ),
+                                    );
+                                Navigator.pop(context);
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedStatus != null &&
+                                  selectedReason != null &&
+                                  pickedImage != null
+                              ? (selectedStatus == 'completed'
+                                  ? Colors.green
+                                  : Colors.red)
+                              : Colors.grey,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: Text('Xác nhận'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  List<String> _getReasonsByStatus(String status) {
+    switch (status) {
+      case 'completed':
+        return [
+          'Giao hàng thành công',
+          'Khách hàng nhận hàng',
+          'Hoàn thành đúng thời gian',
+          'Khách hàng hài lòng',
+        ];
+      case 'failed':
+        return [
+          'Khách hàng không có mặt',
+          'Địa chỉ sai/không tìm thấy',
+          'Khách hàng từ chối nhận',
+          'Hàng hóa bị hư hỏng',
+          'Khách hàng hủy đơn',
+          'Lý do khác',
+        ];
+      default:
+        return [];
+    }
+  }
+
   void _navigateToDelivery(BuildContext context) {
+    // Create LatLng from address coordinates if available
+    LatLng? destinationLatLng;
+    if (widget.address?.latitude != null && widget.address?.longitude != null) {
+      destinationLatLng =
+          LatLng(widget.address!.latitude!, widget.address!.longitude!);
+    }
+
     Navigator.pushNamed(
       context,
       '/delivery',
@@ -310,6 +692,7 @@ class _TransportCardState extends State<TransportCard>
         'transport': widget.transport,
         'address': widget.address,
         'token': widget.token,
+        'destinationLatLng': destinationLatLng,
       },
     );
   }
@@ -364,7 +747,7 @@ class _TransportCardState extends State<TransportCard>
                 SizedBox(height: 12),
                 _buildCreatorInfo(),
                 SizedBox(height: 16),
-                _buildActionButton(),
+                _buildActionButtons(),
               ],
             ),
           ),
@@ -520,7 +903,7 @@ class _TransportCardState extends State<TransportCard>
     );
   }
 
-  Widget _buildActionButton() {
+  Widget _buildActionButtons() {
     if (widget.transport.status == 'inWarehouse') {
       return SizedBox(
         width: double.infinity,
@@ -539,21 +922,42 @@ class _TransportCardState extends State<TransportCard>
         ),
       );
     } else if (widget.transport.status == 'shipping') {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () => _navigateToDelivery(context),
-          icon: Icon(Icons.location_on, size: 18),
-          label: Text('Xem vị trí khách hàng'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _navigateToDelivery(context),
+              icon: Icon(Icons.location_on, size: 18),
+              label: Text('Xem vị trí khách hàng'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
-        ),
+          SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _showDeliveryStatusDialog(context),
+              icon: Icon(Icons.check_circle, size: 18),
+              label: Text('Xác nhận đơn hàng'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
     return SizedBox.shrink();

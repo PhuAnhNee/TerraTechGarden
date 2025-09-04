@@ -51,7 +51,7 @@ class UpdateTransportStatusEvent extends ShipEvent {
     required this.token,
     this.reason,
     this.imagePath,
-    this.contactFailNumber,
+    this.contactFailNumber = '0',
     this.assignToUserId,
   });
 }
@@ -60,4 +60,9 @@ class LoadTransportByOrderEvent extends ShipEvent {
   final int orderId;
   final String token;
   LoadTransportByOrderEvent({required this.orderId, required this.token});
+}
+
+class LoadTransportHistoryEvent extends ShipEvent {
+  final String token;
+  LoadTransportHistoryEvent({required this.token});
 }

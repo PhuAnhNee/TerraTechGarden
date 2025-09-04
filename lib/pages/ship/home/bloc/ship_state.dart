@@ -90,3 +90,14 @@ class AddressLoaded extends ShipState {
   @override
   List<Object?> get props => [address];
 }
+
+class TransportHistoryLoaded extends ShipState {
+  final List<Transport> transports;
+  final Map<int, Address> addresses; // orderId -> Address mapping
+
+  const TransportHistoryLoaded(
+      {required this.transports, required this.addresses});
+
+  @override
+  List<Object?> get props => [transports, addresses];
+}

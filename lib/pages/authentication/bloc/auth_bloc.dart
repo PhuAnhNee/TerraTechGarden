@@ -45,6 +45,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
+  // Sửa lại phần _onLoginRequested trong auth_bloc.dart
+
   Future<void> _onLoginRequested(
       LoginRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
@@ -81,7 +83,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             as String?;
 
         _scheduleTokenRefresh(_storedToken!);
-        emit(AuthSuccess(role: role));
+
+        // THAY ĐỔI QUAN TRỌNG: Pass token vào AuthSuccess
+        emit(AuthSuccess(role: role, token: _storedToken));
       } else {
         final errorMessage = _parseErrorResponse(response);
         print(

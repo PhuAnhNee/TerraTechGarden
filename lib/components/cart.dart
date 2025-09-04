@@ -16,17 +16,16 @@ class Cart extends StatefulWidget {
 }
 
 class _CartState extends State<Cart> {
-  Map<String, String> accessoryImages = {}; // Cache for accessory images
+  Map<String, String> accessoryImages = {};
 
   String _formatCurrency(double amount) {
-    // Format currency for VND (Vietnamese Dong)
     final formatter = NumberFormat('#,###', 'vi_VN');
     return '${formatter.format(amount.toInt())} VNĐ';
   }
 
   Future<void> _fetchAccessoryImage(String accessoryId) async {
     if (accessoryImages.containsKey(accessoryId)) {
-      return; // Already cached
+      return;
     }
 
     try {
@@ -40,18 +39,10 @@ class _CartState extends State<Cart> {
         }),
       );
 
-      developer.log(
-          'API Response for accessory $accessoryId: ${response.statusCode} - ${response.data}',
-          name: 'Cart');
-
       if (response.statusCode == 200 && response.data['status'] == 200) {
         final data = response.data['data'] as Map<String, dynamic>?;
         if (data != null) {
           final imageUrl = data['imageUrl']?.toString() ?? '';
-          developer.log(
-              'Extracted imageUrl for accessory $accessoryId: $imageUrl',
-              name: 'Cart');
-
           setState(() {
             accessoryImages[accessoryId] = imageUrl.isNotEmpty ? imageUrl : '';
           });
@@ -61,16 +52,11 @@ class _CartState extends State<Cart> {
           });
         }
       } else {
-        developer.log(
-            'Invalid response for accessory $accessoryId: status ${response.data['status']}',
-            name: 'Cart');
         setState(() {
           accessoryImages[accessoryId] = '';
         });
       }
-    } catch (e, stackTrace) {
-      developer.log('Error fetching image for accessory $accessoryId: $e',
-          name: 'Cart', error: e, stackTrace: stackTrace);
+    } catch (e) {
       setState(() {
         accessoryImages[accessoryId] = '';
       });
@@ -82,33 +68,89 @@ class _CartState extends State<Cart> {
         item['accessoryId']?.toString() ?? item['id']?.toString();
     if (accessoryId == null) return '';
 
-    // If image is already cached, return it
     if (accessoryImages.containsKey(accessoryId)) {
       return accessoryImages[accessoryId] ?? '';
     }
 
-    // Otherwise, fetch the image
     _fetchAccessoryImage(accessoryId);
-    return ''; // Return empty until image is loaded
+    return '';
   }
 
-  void _showDeleteConfirmDialog(BuildContext context, dynamic itemId) {
+  void _showDeleteConfirmDialog(BuildContext context, dynamic item) {
+    developer.log('=== SHOWING DELETE DIALOG ===', name: 'Cart');
+
+    // Try multiple ways to get the ID
+    final cartItemId1 = item['cartItemId'];
+    final cartItemId2 = item['id'];
+    final accessoryId = item['accessoryId'];
+
+    developer.log(
+        'cartItemId option 1: $cartItemId1 (${cartItemId1.runtimeType})',
+        name: 'Cart');
+    developer.log(
+        'cartItemId option 2: $cartItemId2 (${cartItemId2.runtimeType})',
+        name: 'Cart');
+    developer.log('accessoryId: $accessoryId (${accessoryId.runtimeType})',
+        name: 'Cart');
+
+    // Choose the best ID
+    dynamic finalId;
+    if (cartItemId1 != null && cartItemId1.toString() != 'null') {
+      finalId = cartItemId1;
+    } else if (cartItemId2 != null && cartItemId2.toString() != 'null') {
+      finalId = cartItemId2;
+    } else {
+      developer.log('ERROR: No valid ID found!', name: 'Cart');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lỗi: Không tìm thấy ID hợp lệ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    developer.log('Final ID chosen: $finalId (${finalId.runtimeType})',
+        name: 'Cart');
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Xác nhận xóa'),
-          content: const Text(
-              'Bạn có chắc chắn muốn xóa sản phẩm này khỏi giỏ hàng?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                  'Bạn có chắc chắn muốn xóa sản phẩm này khỏi giỏ hàng?'),
+              const SizedBox(height: 8),
+              // Debug info in dialog
+              Text(
+                'Debug: ID = $finalId',
+                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              ),
+            ],
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                developer.log('User cancelled delete', name: 'Cart');
+                Navigator.of(context).pop();
+              },
               child: const Text('Hủy'),
             ),
             TextButton(
               onPressed: () {
+                developer.log('=== USER CONFIRMED DELETE ===', name: 'Cart');
+                developer.log('Sending delete request for ID: $finalId',
+                    name: 'Cart');
+
                 Navigator.of(context).pop();
-                context.read<CartBloc>().add(DeleteCartItem(itemId.toString()));
+
+                // Dispatch delete event
+                context
+                    .read<CartBloc>()
+                    .add(DeleteCartItem(finalId.toString()));
               },
               child: const Text('Xóa', style: TextStyle(color: Colors.red)),
             ),
@@ -122,7 +164,11 @@ class _CartState extends State<Cart> {
   Widget build(BuildContext context) {
     return BlocListener<CartBloc, CartState>(
       listener: (context, state) {
+        developer.log('=== CART STATE CHANGED ===', name: 'Cart');
+        developer.log('New state: ${state.runtimeType}', name: 'Cart');
+
         if (state is CartOperationSuccess) {
+          developer.log('Success message: ${state.message}', name: 'Cart');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
@@ -131,6 +177,7 @@ class _CartState extends State<Cart> {
             ),
           );
         } else if (state is CartError) {
+          developer.log('Error message: ${state.message}', name: 'Cart');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
@@ -138,6 +185,12 @@ class _CartState extends State<Cart> {
               duration: const Duration(seconds: 3),
             ),
           );
+        } else if (state is CartLoading) {
+          developer.log('Cart is loading...', name: 'Cart');
+        } else if (state is CartLoaded) {
+          developer.log(
+              'Cart loaded with ${(state.cartData['items'] as List).length} items',
+              name: 'Cart');
         }
       },
       child: BlocBuilder<CartBloc, CartState>(
@@ -174,6 +227,7 @@ class _CartState extends State<Cart> {
                 ),
               );
             }
+
             return Column(
               children: [
                 Expanded(
@@ -182,13 +236,18 @@ class _CartState extends State<Cart> {
                     itemCount: cartItems.length,
                     itemBuilder: (context, index) {
                       final item = cartItems[index];
+
+                      developer.log('Cart item $index: $item', name: 'Cart');
+                      developer.log(
+                          'Cart item ID: ${item['cartItemId']} (${item['cartItemId'].runtimeType})',
+                          name: 'Cart');
+
                       final originalPrice =
                           item['originalPrice'] ?? item['price'];
                       final discountedPrice = item['price'];
                       final defaultImageUrl =
                           'https://i.pinimg.com/1200x/d1/d5/1f/d1d51f814f974cc6b9bb438c1c790d59.jpg';
 
-                      // Get the image URL from API or use cached version
                       final apiImageUrl = _getAccessoryImageUrl(item);
                       final imageUrl = apiImageUrl.isNotEmpty
                           ? apiImageUrl
@@ -289,7 +348,7 @@ class _CartState extends State<Cart> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
-                                    // Description (if available)
+                                    // Description
                                     if (item['description'] != null &&
                                         item['description']
                                             .toString()
@@ -361,22 +420,42 @@ class _CartState extends State<Cart> {
                                                           currentQuantity - 1;
 
                                                       if (newQuantity > 0) {
-                                                        context
-                                                            .read<CartBloc>()
-                                                            .add(
-                                                              UpdateCartItem(
-                                                                item['cartItemId']
-                                                                    .toString(),
-                                                                {
-                                                                  'accessoryQuantity':
-                                                                      newQuantity
-                                                                },
-                                                              ),
-                                                            );
+                                                        // Convert to proper format for update
+                                                        final cartItemIdRaw =
+                                                            item['cartItemId'] ??
+                                                                item['id'];
+                                                        final cartItemId =
+                                                            cartItemIdRaw is int
+                                                                ? cartItemIdRaw
+                                                                    .toString()
+                                                                : cartItemIdRaw
+                                                                    ?.toString();
+
+                                                        if (cartItemId !=
+                                                                null &&
+                                                            cartItemId
+                                                                .isNotEmpty &&
+                                                            cartItemId !=
+                                                                'null') {
+                                                          context
+                                                              .read<CartBloc>()
+                                                              .add(
+                                                                UpdateCartItem(
+                                                                  cartItemId,
+                                                                  {
+                                                                    'accessoryQuantity':
+                                                                        newQuantity
+                                                                  },
+                                                                ),
+                                                              );
+                                                        } else {
+                                                          developer.log(
+                                                              'Cannot update: Invalid cartItemId',
+                                                              name: 'Cart');
+                                                        }
                                                       } else {
                                                         _showDeleteConfirmDialog(
-                                                            context,
-                                                            item['cartItemId']);
+                                                            context, item);
                                                       }
                                                     },
                                                     borderRadius:
@@ -422,19 +501,34 @@ class _CartState extends State<Cart> {
                                                       final currentQuantity =
                                                           item['accessoryQuantity'] ??
                                                               1;
-                                                      context
-                                                          .read<CartBloc>()
-                                                          .add(
-                                                            UpdateCartItem(
-                                                              item['cartItemId']
-                                                                  .toString(),
-                                                              {
-                                                                'accessoryQuantity':
-                                                                    currentQuantity +
-                                                                        1
-                                                              },
-                                                            ),
-                                                          );
+                                                      final cartItemId = item[
+                                                                  'cartItemId']
+                                                              ?.toString() ??
+                                                          item['id']
+                                                              ?.toString();
+
+                                                      if (cartItemId != null &&
+                                                          cartItemId
+                                                              .isNotEmpty &&
+                                                          cartItemId !=
+                                                              'null') {
+                                                        context
+                                                            .read<CartBloc>()
+                                                            .add(
+                                                              UpdateCartItem(
+                                                                cartItemId,
+                                                                {
+                                                                  'accessoryQuantity':
+                                                                      currentQuantity +
+                                                                          1
+                                                                },
+                                                              ),
+                                                            );
+                                                      } else {
+                                                        developer.log(
+                                                            'Cannot update: Invalid cartItemId',
+                                                            name: 'Cart');
+                                                      }
                                                     },
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -479,8 +573,25 @@ class _CartState extends State<Cart> {
                               // Delete Button
                               IconButton(
                                 onPressed: () {
-                                  _showDeleteConfirmDialog(
-                                      context, item['cartItemId']);
+                                  // Debug: Log toàn bộ item data
+                                  developer.log('=== DELETE BUTTON CLICKED ===',
+                                      name: 'Cart');
+                                  developer.log(
+                                      'Full item data: ${item.toString()}',
+                                      name: 'Cart');
+                                  developer.log(
+                                      'cartItemId: ${item['cartItemId']}',
+                                      name: 'Cart');
+                                  developer.log(
+                                      'cartItemId type: ${item['cartItemId'].runtimeType}',
+                                      name: 'Cart');
+                                  developer.log('id: ${item['id']}',
+                                      name: 'Cart');
+                                  developer.log(
+                                      'id type: ${item['id'].runtimeType}',
+                                      name: 'Cart');
+
+                                  _showDeleteConfirmDialog(context, item);
                                 },
                                 icon: const Icon(
                                   Icons.delete_outline,
@@ -593,7 +704,6 @@ class _CartState extends State<Cart> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Clear Cart Button
                       ],
                     ),
                   ),

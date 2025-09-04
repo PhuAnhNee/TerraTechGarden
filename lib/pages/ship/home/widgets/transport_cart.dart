@@ -90,7 +90,14 @@ class TransportCart extends StatelessWidget {
         }
 
         if (state is TransportsLoaded) {
-          if (state.transports.isEmpty) {
+          // Filter out completed and failed transports
+          final visibleTransports = state.transports
+              .where((transport) =>
+                  transport.status == 'inWarehouse' ||
+                  transport.status == 'shipping')
+              .toList();
+
+          if (visibleTransports.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -102,7 +109,7 @@ class TransportCart extends StatelessWidget {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'No Transports Available',
+                    'No Active Transports',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -143,9 +150,9 @@ class TransportCart extends StatelessWidget {
             },
             child: ListView.builder(
               padding: EdgeInsets.all(16),
-              itemCount: state.transports.length,
+              itemCount: visibleTransports.length,
               itemBuilder: (context, index) {
-                final transport = state.transports[index];
+                final transport = visibleTransports[index];
                 final address = state.addresses[transport.orderId];
                 return TransportCard(
                   transport: transport,
@@ -158,9 +165,36 @@ class TransportCart extends StatelessWidget {
                       ),
                     );
                   },
-                  token: token, // Token is already passed here
+                  token: token,
                 );
               },
+            ),
+          );
+        }
+
+        if (state is TransportUpdated) {
+          // When transport is updated, reload the transports list
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<ShipBloc>().add(LoadTransportsEvent(token: token));
+          });
+
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Updating transport status...',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
           );
         }

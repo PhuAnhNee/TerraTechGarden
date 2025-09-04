@@ -30,6 +30,8 @@ class NavDrawer extends StatelessWidget {
                 children: [
                   _buildDrawerItem(Icons.home, 'Home', context),
                   _buildDrawerItem(Icons.shopping_cart, 'Cart', context),
+                  _buildDrawerItem(
+                      Icons.list_alt, 'Orders', context), // Added Orders item
                   // _buildDrawerItem(Icons.person, 'Profile', context),
                 ],
               ),
@@ -77,8 +79,12 @@ class NavDrawer extends StatelessWidget {
           case 'Cart':
             Navigator.pushNamed(context, '/cart');
             break;
+          case 'Orders':
+            Navigator.pushNamed(
+                context, '/orders'); // Added navigation for Orders
+            break;
           default:
-            Navigator.pop(context);
+            Navigator.pop(context); // Close drawer for Home or unhandled cases
             break;
         }
       },

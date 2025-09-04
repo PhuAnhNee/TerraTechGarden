@@ -154,7 +154,7 @@ class TerraApi {
 
   // Cart
   static String getCart() => _baseUrl('Cart/get-all');
-  static String addMultipleCartItems() => _baseUrl('Cart/add-items/multiple');
+  static String addMultipleCartItems() => _baseUrl('Cart/add-item');
   static String updateCartItem(String itemId) =>
       _baseUrl('Cart/update-items/$itemId');
   static String deleteCartItem(String itemId) =>
@@ -389,7 +389,7 @@ class TerraApi {
       _baseUrl('TerrariumVariant/get-all-terrariumVariant');
   static String getTerrariumVariantById(String id) =>
       _baseUrl('TerrariumVariant/get-terrariumVariant/$id');
-  static String getVariantByTerrariumId(String id) =>
+  static String getTerrariumVariants(String id) =>
       _baseUrl('TerrariumVariant/get-VariantByTerrarium/$id');
   static String createTerrariumVariant() =>
       _baseUrl('TerrariumVariant/create-terrariumVariant');
