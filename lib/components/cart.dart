@@ -7,6 +7,9 @@ import '../pages/cart/bloc/cart_bloc.dart';
 import '../pages/cart/bloc/cart_state.dart';
 import '../pages/cart/bloc/cart_event.dart';
 import '../../../api/terra_api.dart';
+import '../../../config/config.dart'; // Import AppConfig để lấy token
+import '../pages/authentication/bloc/auth_bloc.dart'; // Import AuthBloc
+import '../pages/authentication/bloc/auth_state.dart'; // Import AuthState
 
 class Cart extends StatefulWidget {
   const Cart({super.key});
@@ -17,6 +20,95 @@ class Cart extends StatefulWidget {
 
 class _CartState extends State<Cart> {
   Map<String, String> accessoryImages = {};
+  bool _isProcessingCheckout = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  // Lấy token từ AppConfig hoặc AuthBloc
+  String? get _currentToken {
+    // Thử lấy từ AppConfig trước
+    if (AppConfig.accessToken != null && AppConfig.accessToken!.isNotEmpty) {
+      return AppConfig.accessToken;
+    }
+
+    // Nếu không có, thử lấy từ AuthBloc
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthSuccess && authState.token != null) {
+      return authState.token;
+    }
+
+    // Hoặc lấy trực tiếp từ AuthBloc
+    return context.read<AuthBloc>().token;
+  }
+
+  Dio _getDio() {
+    final dio = Dio();
+    dio.options.connectTimeout = const Duration(seconds: 30);
+    dio.options.receiveTimeout = const Duration(seconds: 30);
+
+    final token = _currentToken;
+    if (token != null && token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+      developer.log('Using token: ${token.substring(0, 20)}...', name: 'Cart');
+    } else {
+      developer.log('No token available!', name: 'Cart');
+    }
+
+    dio.options.headers['Content-Type'] = 'application/json';
+    dio.options.headers['Accept'] = '*/*';
+
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        developer.log('REQUEST: ${options.method} ${options.path}',
+            name: 'Cart');
+        developer.log('Headers: ${options.headers}', name: 'Cart');
+        handler.next(options);
+      },
+      onResponse: (response, handler) {
+        developer.log(
+            'RESPONSE: ${response.statusCode} ${response.statusMessage}',
+            name: 'Cart');
+        developer.log('Response data: ${response.data}', name: 'Cart');
+        handler.next(response);
+      },
+      onError: (error, handler) {
+        developer.log('ERROR: ${error.response?.statusCode} ${error.message}',
+            name: 'Cart');
+        developer.log('Error response: ${error.response?.data}', name: 'Cart');
+
+        // Nếu lỗi 401 (Unauthorized), có thể token đã hết hạn
+        if (error.response?.statusCode == 401) {
+          developer.log('Token expired or invalid, redirecting to login...',
+              name: 'Cart');
+          _handleTokenExpired();
+        }
+
+        handler.next(error);
+      },
+    ));
+
+    return dio;
+  }
+
+  void _handleTokenExpired() {
+    // Clear token và redirect về login
+    AppConfig.accessToken = null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    // Navigate to login screen
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+    );
+  }
 
   String _formatCurrency(double amount) {
     final formatter = NumberFormat('#,###', 'vi_VN');
@@ -157,6 +249,141 @@ class _CartState extends State<Cart> {
           ],
         );
       },
+    );
+  }
+
+  Future<void> _proceedToCheckout(double totalAmount) async {
+    if (_isProcessingCheckout) return;
+
+    // Check if token is available
+    final token = _currentToken;
+    if (token == null || token.isEmpty) {
+      _showSnackBar(
+          'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', Colors.red);
+      _handleTokenExpired();
+      return;
+    }
+
+    setState(() => _isProcessingCheckout = true);
+
+    try {
+      developer.log('Starting checkout process...', name: 'Cart');
+      developer.log('Using token: ${token.substring(0, 20)}...', name: 'Cart');
+
+      // Call the checkout cart API
+      final response = await _getDio().post(TerraApi.checkoutCart());
+      developer.log('Checkout API response: ${response.data}', name: 'Cart');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = response.data;
+
+        if (responseData is Map<String, dynamic> &&
+            responseData['status'] == 201) {
+          developer.log('Checkout successful, navigating to checkout screen...',
+              name: 'Cart');
+
+          // Extract order data from response
+          final orderData = responseData['data'] as Map<String, dynamic>?;
+
+          // Safely extract totalAmount
+          double extractedTotal = 0.0;
+          if (orderData != null && orderData['total'] != null) {
+            final total = orderData['total'];
+            if (total is num && total.isFinite && !total.isNaN) {
+              extractedTotal = total.toDouble();
+            } else if (total is String) {
+              final parsed = double.tryParse(total);
+              if (parsed != null && parsed.isFinite && !parsed.isNaN) {
+                extractedTotal = parsed;
+              }
+            } else if (total is Map<String, dynamic>) {
+              // Handle nested total, e.g., {"value": 100000, "currency": "VND"}
+              final nestedKeys = [
+                'value',
+                'amount',
+                'totalAmount',
+                'finalAmount'
+              ];
+              for (String key in nestedKeys) {
+                final nestedValue = total[key];
+                if (nestedValue is num &&
+                    nestedValue.isFinite &&
+                    !nestedValue.isNaN) {
+                  extractedTotal = nestedValue.toDouble();
+                  break;
+                } else if (nestedValue is String) {
+                  final parsed = double.tryParse(nestedValue);
+                  if (parsed != null && parsed.isFinite && !parsed.isNaN) {
+                    extractedTotal = parsed;
+                    break;
+                  }
+                }
+              }
+              if (extractedTotal == 0.0) {
+                developer.log('Warning: Could not parse nested total: $total',
+                    name: 'Cart');
+              }
+            }
+          } else {
+            // Fallback to provided totalAmount
+            extractedTotal =
+                totalAmount.isFinite && !totalAmount.isNaN ? totalAmount : 0.0;
+            developer.log(
+                'Warning: No total found in orderData, using fallback: $extractedTotal',
+                name: 'Cart');
+          }
+
+          developer.log('Extracted total: $extractedTotal', name: 'Cart');
+
+          // Navigate to checkout screen with validated totalAmount
+          Navigator.pushNamed(
+            context,
+            '/checkout',
+            arguments: {
+              'totalAmount': extractedTotal,
+              'orderData': orderData,
+            },
+          );
+
+          // Refresh cart after checkout
+          context.read<CartBloc>().add(FetchCart());
+        } else {
+          _showSnackBar(
+              'Checkout thất bại: ${responseData['message'] ?? 'Unknown error'}',
+              Colors.red);
+        }
+      } else {
+        _showSnackBar('Không thể tiến hành checkout', Colors.red);
+      }
+    } catch (e) {
+      developer.log('Checkout error: $e', name: 'Cart');
+
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          _showSnackBar(
+              'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', Colors.red);
+          _handleTokenExpired();
+        } else {
+          final errorMsg = e.response?.data is Map<String, dynamic>
+              ? e.response!.data['message'] ?? e.message
+              : e.message;
+          _showSnackBar('Lỗi checkout: $errorMsg', Colors.red);
+        }
+      } else {
+        _showSnackBar('Lỗi hệ thống: $e', Colors.red);
+      }
+    } finally {
+      setState(() => _isProcessingCheckout = false);
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
@@ -678,14 +905,10 @@ class _CartState extends State<Cart> {
                         const SizedBox(height: 16),
                         // Checkout Button
                         ElevatedButton(
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/checkout',
-                              arguments:
-                                  state.cartData['total']?.toDouble() ?? 0.0,
-                            );
-                          },
+                          onPressed: _isProcessingCheckout
+                              ? null
+                              : () => _proceedToCheckout(
+                                  state.cartData['total']?.toDouble() ?? 0.0),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
                             foregroundColor: Colors.white,
@@ -695,13 +918,37 @@ class _CartState extends State<Cart> {
                             ),
                             elevation: 2,
                           ),
-                          child: Text(
-                            'Thanh toán (${state.cartData['totalCartQuantity'] ?? 0} sản phẩm)',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          child: _isProcessingCheckout
+                              ? const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text(
+                                      'Đang xử lý...',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  'Thanh toán (${state.cartData['totalCartQuantity'] ?? 0} sản phẩm)',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
                         const SizedBox(height: 8),
                       ],

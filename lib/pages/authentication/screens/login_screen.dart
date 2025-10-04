@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import '../../../navigation/routes.dart';
 import '../../../components/message.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import '../screens/forget_pass.dart';
-import '../bloc/login_google.dart';
 
 class LoginScreen extends StatelessWidget {
   final _formKey = GlobalKey<FormState>();
@@ -19,337 +17,306 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get screen size for responsive calculations
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 600; // Detect small screens
+    final isSmallScreen = screenHeight < 600;
 
-    print('Building LoginScreen'); // Debug
     return Scaffold(
       body: SingleChildScrollView(
-        // Add scroll view for small screens
         child: Container(
           width: double.infinity,
           constraints: BoxConstraints(
-            minHeight: screenHeight, // Ensure it takes at least full height
+            minHeight: screenHeight,
           ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: [
-                Color(0xFF4CAF50), // Green shade 900
-                Color(0xFF66BB6A), // Green shade 800
-                Color(0xFF81C784), // Green shade 400
+                Color(0xFF2E7D32), // Dark green
+                Color(0xFF4CAF50), // Main green
+                Color(0xFF66BB6A), // Light green
+                Color(0xFF81C784), // Lighter green
               ],
+              stops: [0.0, 0.3, 0.7, 1.0],
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              SizedBox(
-                  height: isSmallScreen ? 40 : 80), // Responsive top padding
+              SizedBox(height: isSmallScreen ? 60 : 100),
+
+              // Logo/Icon section
+              FadeInDown(
+                duration: Duration(milliseconds: 1000),
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(60),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.eco,
+                    size: 60,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 30),
+
+              // Title section
               Padding(
-                padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     FadeInUp(
-                      duration: Duration(milliseconds: 1000),
+                      duration: Duration(milliseconds: 1200),
                       child: Text(
                         "TerraTechGarden",
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: isSmallScreen ? 28 : 32,
+                          fontSize: isSmallScreen ? 32 : 36,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
                           shadows: [
                             Shadow(
                               color: Colors.black26,
                               offset: Offset(2.0, 2.0),
-                              blurRadius: 4.0,
+                              blurRadius: 8.0,
                             ),
                           ],
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                    SizedBox(height: isSmallScreen ? 8 : 10),
+                    SizedBox(height: 12),
                     FadeInUp(
-                      duration: Duration(milliseconds: 1300),
+                      duration: Duration(milliseconds: 1400),
                       child: Text(
                         "Chào mừng bạn đến với TerraTechGarden",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.white.withOpacity(0.9),
                           fontSize: isSmallScreen ? 16 : 18,
+                          fontWeight: FontWeight.w300,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: isSmallScreen ? 16 : 20),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(isSmallScreen ? 40 : 60),
-                    topRight: Radius.circular(isSmallScreen ? 40 : 60),
+
+              SizedBox(height: isSmallScreen ? 40 : 60),
+
+              // Form container
+              FadeInUp(
+                duration: Duration(milliseconds: 1600),
+                child: Container(
+                  width: screenWidth,
+                  margin: EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 25,
+                        offset: Offset(0, 15),
+                      ),
+                    ],
                   ),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(isSmallScreen ? 20 : 30),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: <Widget>[
-                        SizedBox(height: isSmallScreen ? 30 : 60),
-                        FadeInUp(
-                          duration: Duration(milliseconds: 1400),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Color(0xFF4CAF50).withOpacity(0.3),
-                                  blurRadius: 20,
-                                  offset: Offset(0, 10),
-                                ),
-                              ],
+                  child: Padding(
+                    padding: EdgeInsets.all(isSmallScreen ? 25 : 35),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          // Welcome text
+                          Text(
+                            "Đăng Nhập",
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 24 : 28,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E7D32),
                             ),
-                            child: Column(
-                              children: <Widget>[
-                                Container(
-                                  padding: EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: Colors.grey.shade200,
-                                      ),
-                                    ),
-                                  ),
-                                  child: TextFormField(
-                                    controller: _usernameController,
-                                    decoration: InputDecoration(
-                                      hintText: "Tên đăng nhập",
-                                      hintStyle: TextStyle(color: Colors.grey),
-                                      border: InputBorder.none,
-                                    ),
-                                    validator: (value) {
-                                      if (value?.isEmpty ?? true) {
-                                        return 'Vui lòng nhập tên đăng nhập';
-                                      }
-                                      if (value!.length < 3) {
-                                        return 'Tên đăng nhập phải có ít nhất 3 ký tự';
-                                      }
-                                      return null;
-                                    },
-                                    keyboardType: TextInputType.text,
-                                  ),
-                                ),
-                                Container(
-                                  padding: EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: Colors.grey.shade200,
-                                      ),
-                                    ),
-                                  ),
-                                  child: TextFormField(
-                                    controller: _passwordController,
-                                    obscureText: true,
-                                    decoration: InputDecoration(
-                                      hintText: "Mật khẩu",
-                                      hintStyle: TextStyle(color: Colors.grey),
-                                      border: InputBorder.none,
-                                    ),
-                                    validator: (value) {
-                                      if (value?.isEmpty ?? true) {
-                                        return 'Vui lòng nhập mật khẩu';
-                                      }
-                                      if (value!.length < 6) {
-                                        return 'Mật khẩu phải có ít nhất 6 ký tự';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
+                            textAlign: TextAlign.center,
                           ),
-                        ),
-                        SizedBox(height: isSmallScreen ? 20 : 40),
-                        FadeInUp(
-                          duration: Duration(milliseconds: 1500),
-                          child: TextButton(
-                            onPressed: () {
-                              print('Forgot Password TextButton pressed');
-                              showDialog(
-                                context: context,
-                                builder: (context) => ForgetPass(),
-                              );
-                            },
-                            child: Text(
-                              "Quên mật khẩu?",
-                              style: TextStyle(color: Colors.grey),
+
+                          Text(
+                            "Vui lòng nhập thông tin của bạn",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
                             ),
+                            textAlign: TextAlign.center,
                           ),
-                        ),
-                        SizedBox(height: isSmallScreen ? 20 : 40),
-                        BlocListener<AuthBloc, AuthState>(
-                          listener: (context, state) {
-                            print('AuthBloc State in LoginScreen: $state');
-                            if (state is AuthSuccess) {
-                              print('Navigating based on role: ${state.role}');
-                              _showSuccessNotification(context);
-                              ScaffoldMessenger.of(context).clearSnackBars();
-                              if (state.role == 'Shipper') {
-                                Navigator.pushReplacementNamed(
-                                    context, Routes.shipperHome);
-                              } else {
-                                Navigator.pushReplacementNamed(
-                                    context, Routes.home);
+
+                          SizedBox(height: isSmallScreen ? 25 : 35),
+
+                          // Username field
+                          _buildInputField(
+                            controller: _usernameController,
+                            hintText: "Tên đăng nhập",
+                            icon: Icons.person_outline,
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập tên đăng nhập';
                               }
-                            } else if (state is AuthFailure) {
-                              _showErrorNotification(context, state.error);
-                            }
-                          },
-                          child: BlocBuilder<AuthBloc, AuthState>(
-                            builder: (context, state) {
-                              return FadeInUp(
-                                duration: Duration(milliseconds: 1600),
-                                child: AnimatedOpacity(
-                                  opacity: state is AuthLoading ? 0.5 : 1.0,
-                                  duration: const Duration(milliseconds: 300),
-                                  child: MaterialButton(
-                                    onPressed: state is AuthLoading
-                                        ? null
-                                        : () {
-                                            if (_formKey.currentState!
-                                                .validate()) {
-                                              final username =
-                                                  _usernameController.text
-                                                      .trim();
-                                              final password =
-                                                  _passwordController.text
-                                                      .trim();
-                                              context.read<AuthBloc>().add(
-                                                    LoginRequested(
-                                                      username: username,
-                                                      password: password,
-                                                    ),
-                                                  );
-                                            }
-                                          },
-                                    height: 50,
-                                    minWidth: double.infinity,
-                                    color: Color(0xFF4CAF50),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(50),
-                                    ),
-                                    child: state is AuthLoading
-                                        ? SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2.0,
-                                            ),
-                                          )
-                                        : Text(
-                                            "Đăng Nhập",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              );
+                              if (value!.length < 3) {
+                                return 'Tên đăng nhập phải có ít nhất 3 ký tự';
+                              }
+                              return null;
                             },
                           ),
-                        ),
-                        SizedBox(height: isSmallScreen ? 15 : 30),
-                        FadeInUp(
-                          duration: Duration(milliseconds: 1700),
-                          child: TextButton(
-                            onPressed: () {
-                              print('Register TextButton pressed');
-                              try {
-                                Navigator.pushNamed(context, Routes.register);
-                                print('Navigated to register screen');
-                              } catch (e) {
-                                print('Navigation error: $e');
-                                _showErrorNotification(context, 'Lỗi hệ thống');
+
+                          SizedBox(height: 20),
+
+                          // Password field
+                          _buildInputField(
+                            controller: _passwordController,
+                            hintText: "Mật khẩu",
+                            icon: Icons.lock_outline,
+                            isPassword: true,
+                            validator: (value) {
+                              if (value?.isEmpty ?? true) {
+                                return 'Vui lòng nhập mật khẩu';
                               }
+                              if (value!.length < 6) {
+                                return 'Mật khẩu phải có ít nhất 6 ký tự';
+                              }
+                              return null;
                             },
-                            child: Text(
-                              "Chưa có tài khoản? Đăng ký",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: isSmallScreen ? 14 : 16,
+                          ),
+
+                          SizedBox(height: 15),
+
+                          // Forgot password
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => ForgetPass(),
+                                );
+                              },
+                              child: Text(
+                                "Quên mật khẩu?",
+                                style: TextStyle(
+                                  color: Color(0xFF4CAF50),
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        SizedBox(height: isSmallScreen ? 15 : 30),
-                        FadeInUp(
-                          duration: Duration(milliseconds: 1800),
-                          child: Text(
-                            "Hoặc đăng nhập bằng",
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                        SizedBox(height: isSmallScreen ? 15 : 30),
-                        FadeInUp(
-                          duration: Duration(milliseconds: 1900),
-                          child: MaterialButton(
-                            onPressed: () async {
-                              print('Google Login Button pressed');
-                              // await _handleGoogleSignIn(context);
+
+                          SizedBox(height: isSmallScreen ? 25 : 35),
+
+                          // Login button
+                          BlocListener<AuthBloc, AuthState>(
+                            listener: (context, state) {
+                              if (state is AuthSuccess) {
+                                _showSuccessNotification(context);
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                if (state.role == 'Shipper') {
+                                  Navigator.pushReplacementNamed(
+                                      context, Routes.shipperHome);
+                                } else {
+                                  Navigator.pushReplacementNamed(
+                                      context, Routes.home);
+                                }
+                              } else if (state is AuthFailure) {
+                                _showErrorNotification(context, state.error);
+                              }
                             },
-                            height: 50,
-                            minWidth: double.infinity,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(50),
-                              side: BorderSide(color: Colors.grey.shade300),
+                            child: BlocBuilder<AuthBloc, AuthState>(
+                              builder: (context, state) {
+                                return _buildLoginButton(
+                                    context, state, isSmallScreen);
+                              },
                             ),
-                            color: Colors.white,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.asset(
-                                  'assets/images/google_logo.png',
-                                  height: 24,
-                                  width: 24,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      Icons.g_mobiledata,
-                                      color: Colors.red,
-                                      size: 24,
-                                    );
-                                  },
+                          ),
+
+                          SizedBox(height: isSmallScreen ? 20 : 30),
+
+                          // Divider
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.grey[300],
+                                  thickness: 1,
                                 ),
-                                SizedBox(width: 12),
-                                Text(
-                                  "Đăng nhập với Google",
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  "hoặc",
                                   style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: isSmallScreen ? 14 : 16,
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
                                   ),
                                 ),
-                              ],
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.grey[300],
+                                  thickness: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          SizedBox(height: isSmallScreen ? 20 : 30),
+
+                          // Register button
+                          Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Color(0xFF4CAF50),
+                                width: 2,
+                              ),
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: MaterialButton(
+                              onPressed: () {
+                                try {
+                                  Navigator.pushNamed(context, Routes.register);
+                                } catch (e) {
+                                  _showErrorNotification(
+                                      context, 'Lỗi hệ thống');
+                                }
+                              },
+                              child: Text(
+                                "Đăng Ký Tài Khoản",
+                                style: TextStyle(
+                                  color: Color(0xFF4CAF50),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
                             ),
                           ),
-                        ),
-                        SizedBox(
-                            height: isSmallScreen ? 20 : 30), // Bottom padding
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
+
+              SizedBox(height: 30),
             ],
           ),
         ),
@@ -357,18 +324,104 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  // Future<void> _handleGoogleSignIn(BuildContext context) async {
-  //   try {
-  //     final GoogleAuthProvider authProvider = GoogleAuthProvider();
-  //     final UserCredential userCredential =
-  //         await FirebaseAuth.instance.signInWithProvider(authProvider);
-  //     final String accessToken = await userCredential.credential?.token ?? '';
-  //     await performGoogleLogin(context, accessToken);
-  //   } catch (e) {
-  //     print('Firebase Google Sign-In Error: $e');
-  //     _showErrorNotification(context, 'Lỗi hệ thống');
-  //   }
-  // }
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    bool isPassword = false,
+    required String? Function(String?) validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: Colors.grey[200]!,
+          width: 1,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: isPassword,
+        validator: validator,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(
+            icon,
+            color: Color(0xFF4CAF50),
+            size: 20,
+          ),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        style: TextStyle(
+          fontSize: 16,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginButton(
+      BuildContext context, AuthState state, bool isSmallScreen) {
+    return Container(
+      width: double.infinity,
+      height: 50,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF4CAF50),
+            Color(0xFF66BB6A),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFF4CAF50).withOpacity(0.3),
+            blurRadius: 15,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: MaterialButton(
+        onPressed: state is AuthLoading
+            ? null
+            : () {
+                if (_formKey.currentState!.validate()) {
+                  final username = _usernameController.text.trim();
+                  final password = _passwordController.text.trim();
+                  context.read<AuthBloc>().add(
+                        LoginRequested(
+                          username: username,
+                          password: password,
+                        ),
+                      );
+                }
+              },
+        child: state is AuthLoading
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.0,
+                ),
+              )
+            : Text(
+                "Đăng Nhập",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(25),
+        ),
+      ),
+    );
+  }
 
   void _showSuccessNotification(BuildContext context) {
     OverlayEntry overlayEntry = OverlayEntry(
@@ -416,7 +469,6 @@ class LoginScreen extends StatelessWidget {
     );
 
     Overlay.of(context).insert(overlayEntry);
-
     Future.delayed(Duration(seconds: 2), () {
       overlayEntry.remove();
     });
@@ -435,7 +487,7 @@ class LoginScreen extends StatelessWidget {
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             decoration: BoxDecoration(
-              color: Color(0xFF26A69A), // Teal color instead of red
+              color: Colors.redAccent,
               borderRadius: BorderRadius.circular(12.0),
               boxShadow: [
                 BoxShadow(
@@ -448,7 +500,7 @@ class LoginScreen extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.info_outline, color: Colors.white, size: 22.0),
+                Icon(Icons.error_outline, color: Colors.white, size: 22.0),
                 SizedBox(width: 12.0),
                 Flexible(
                   child: Text(
@@ -469,14 +521,12 @@ class LoginScreen extends StatelessWidget {
     );
 
     Overlay.of(context).insert(overlayEntry);
-
     Future.delayed(Duration(seconds: 3), () {
       overlayEntry.remove();
     });
   }
 
   String _getSimpleErrorMessage(String error) {
-    // Convert complex error messages to simple user-friendly messages
     String lowerError = error.toLowerCase();
 
     if (lowerError.contains('password') ||
@@ -505,7 +555,6 @@ class LoginScreen extends StatelessWidget {
       return 'Lỗi hệ thống';
     }
 
-    // Default fallback for any other errors
     return 'Lỗi hệ thống';
   }
 }

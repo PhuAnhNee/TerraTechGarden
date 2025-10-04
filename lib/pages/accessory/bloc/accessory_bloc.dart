@@ -105,14 +105,19 @@ class AccessoryBloc extends Bloc<AccessoryEvent, AccessoryState> {
   // Sanitize và validate dữ liệu accessory
   Map<String, dynamic> _sanitizeAccessoryData(Map<String, dynamic> data) {
     return {
-      'id': data['id'] ?? '',
-      'accessoryName':
-          data['accessoryName']?.toString().trim() ?? 'Chưa có tên',
+      'id': data['accessoryId'] ?? data['id'] ?? '',
+      'accessoryName': data['name']?.toString().trim() ?? 'Chưa có tên',
       'price': _formatPrice(data['price']),
       'accessoryImages': _sanitizeImages(data['accessoryImages']),
       'description': data['description']?.toString().trim() ?? '',
       'category': data['category']?.toString().trim() ?? '',
-      'stock': data['stock'] ?? 0,
+      'stock': data['stockQuantity'] ?? data['stock'] ?? 0,
+      'size': data['size']?.toString().trim() ?? '',
+      'quantitative': data['quantitative']?.toString().trim() ?? '',
+      'averageRating': data['averageRating'] ?? 0,
+      'feedbackCount': data['feedbackCount'] ?? 0,
+      'purchaseCount': data['purchaseCount'] ?? 0,
+      'status': data['status']?.toString().trim() ?? '',
     };
   }
 

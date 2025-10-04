@@ -159,8 +159,76 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   Future<void> _initializeDelivery() async {
+    print('=== INITIALIZE DELIVERY START ===');
     await _checkAndGetLocation();
     await _setDestinationCoordinates();
+    print('=== INITIALIZE DELIVERY END ===');
+  }
+
+  Future<void> _checkAndGetLocation() async {
+    print('=== GET LOCATION START ===');
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _errorMessage = 'Vui lòng bật dịch vụ định vị trên thiết bị.';
+        });
+        print('Location services disabled');
+        return;
+      }
+
+      print('Checking permissions...');
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        print('Requesting permission...');
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _errorMessage =
+                'Ứng dụng cần quyền truy cập vị trí. Vui lòng cấp quyền.';
+          });
+          print('Permission denied');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _errorMessage =
+              'Quyền truy cập vị trí bị từ chối vĩnh viễn. Vui lòng bật trong cài đặt.';
+        });
+        print('Permission denied forever');
+        return;
+      }
+
+      print('Getting current position...');
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      );
+
+      setState(() {
+        _currentLatLng = LatLng(position.latitude, position.longitude);
+        _errorMessage = null;
+      });
+      print('Current location obtained: $_currentLatLng');
+
+      // Update camera to current location
+      if (_currentLatLng != null && _controller.isCompleted) {
+        GoogleMapController controller = await _controller.future;
+        controller.animateCamera(CameraUpdate.newLatLng(_currentLatLng!));
+      }
+    } catch (e) {
+      print('Location error: $e');
+      // Use Ho Chi Minh City center as fallback
+      setState(() {
+        _currentLatLng = const LatLng(10.8231, 106.6297);
+        _errorMessage = null;
+      });
+      print('Using fallback location: $_currentLatLng');
+    }
+    print('=== GET LOCATION END ===');
   }
 
   Future<void> _setDestinationCoordinates() async {
@@ -207,103 +275,262 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Future<void> _geocodeAddress() async {
     print('=== GEOCODING START ===');
     try {
-      final encodedAddress = Uri.encodeQueryComponent(receiverAddress);
-      final url =
-          'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddress&limit=1';
+      // Try multiple geocoding strategies
+      LatLng? coordinates = await _tryMultipleGeocodingServices();
 
-      print('Geocoding URL: $url');
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'User-Agent': 'DeliveryApp/1.0'},
-      );
-
-      print('Geocoding response status: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('Geocoding response: $data');
-        if (data.isNotEmpty) {
-          final lat = double.parse(data[0]['lat']);
-          final lon = double.parse(data[0]['lon']);
-          setState(() {
-            _finalDestinationLatLng = LatLng(lat, lon);
-          });
-          print('Updated coordinates from geocoding: $_finalDestinationLatLng');
-        } else {
-          print('No geocoding results found');
-          _showErrorSnackBar('Không tìm thấy địa chỉ');
-        }
+      if (coordinates != null) {
+        setState(() {
+          _finalDestinationLatLng = coordinates;
+        });
+        print('Successfully geocoded: $_finalDestinationLatLng');
       } else {
-        print('Geocoding failed with status: ${response.statusCode}');
-        _showErrorSnackBar('Lỗi geocoding');
+        print('All geocoding methods failed');
+        _showErrorSnackBar('Không tìm thấy địa chỉ chính xác');
+
+        // Fallback to Ho Chi Minh City center as last resort
+        setState(() {
+          _finalDestinationLatLng = const LatLng(10.8231, 106.6297);
+        });
+        print('Using Ho Chi Minh City center as fallback');
       }
     } catch (e) {
       print('Geocoding error: $e');
       _showErrorSnackBar('Lỗi khi tìm địa chỉ');
+
+      // Fallback coordinates
+      setState(() {
+        _finalDestinationLatLng = const LatLng(10.8231, 106.6297);
+      });
     }
     print('=== GEOCODING END ===');
   }
 
-  Future<void> _checkAndGetLocation() async {
-    print('=== GET LOCATION START ===');
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() {
-        _errorMessage = 'Vui lòng bật dịch vụ định vị trên thiết bị.';
-      });
-      print('Location services disabled');
-      return;
-    }
+  Future<LatLng?> _tryMultipleGeocodingServices() async {
+    // Strategy 1: Try with simplified address (remove detailed parts)
+    LatLng? result = await _geocodeWithSimplifiedAddress();
+    if (result != null) return result;
 
-    print('Checking permissions...');
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      print('Requesting permission...');
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        setState(() {
-          _errorMessage =
-              'Ứng dụng cần quyền truy cập vị trí. Vui lòng cấp quyền.';
-        });
-        print('Permission denied');
-        return;
+    // Strategy 2: Try with district/city only
+    result = await _geocodeDistrictOnly();
+    if (result != null) return result;
+
+    // Strategy 3: Try original full address with Nominatim
+    result = await _geocodeWithNominatim(receiverAddress);
+    if (result != null) return result;
+
+    // Strategy 4: Try Google Geocoding API if available
+    // result = await _geocodeWithGoogle();
+    // if (result != null) return result;
+
+    return null;
+  }
+
+  Future<LatLng?> _geocodeWithSimplifiedAddress() async {
+    print('Trying simplified address geocoding...');
+
+    // Extract main parts from Vietnamese address
+    String simplified = _simplifyVietnameseAddress(receiverAddress);
+    if (simplified.isNotEmpty) {
+      return await _geocodeWithNominatim(simplified);
+    }
+    return null;
+  }
+
+  String _simplifyVietnameseAddress(String fullAddress) {
+    // Remove house numbers and detailed parts, keep district and city
+    String simplified = fullAddress;
+
+    // Remove house/building numbers (pattern: số X, X/, etc.)
+    simplified =
+        simplified.replaceAll(RegExp(r'số\s*\d+[A-Za-z]*/?\d*[,\s]*'), '');
+    simplified = simplified.replaceAll(RegExp(r'\d+[A-Za-z]*/?\d*[,\s]*'), '');
+
+    // Keep only district and city information
+    List<String> parts = simplified.split(',');
+    List<String> importantParts = [];
+
+    for (String part in parts) {
+      String trimmed = part.trim();
+      if (trimmed.contains('Quận') ||
+          trimmed.contains('Huyện') ||
+          trimmed.contains('Thành phố') ||
+          trimmed.contains('Phường') ||
+          trimmed.contains('Xã')) {
+        importantParts.add(trimmed);
       }
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      setState(() {
-        _errorMessage =
-            'Quyền truy cập vị trí bị từ chối vĩnh viễn. Vui lòng bật trong cài đặt.';
-      });
-      print('Permission denied forever');
-      return;
+    String result = importantParts.join(', ');
+    print('Simplified address: "$fullAddress" -> "$result"');
+    return result;
+  }
+
+  Future<LatLng?> _geocodeDistrictOnly() async {
+    print('Trying district-only geocoding...');
+
+    // Extract district and city
+    List<String> parts = receiverAddress.split(',');
+    String districtCity = '';
+
+    for (String part in parts) {
+      String trimmed = part.trim();
+      if (trimmed.contains('Quận') || trimmed.contains('Thành phố')) {
+        districtCity += trimmed + ', ';
+      }
     }
 
-    print('Getting current position...');
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 10),
-      );
-      setState(() {
-        _currentLatLng = LatLng(position.latitude, position.longitude);
-        _errorMessage = null;
-      });
-      print('Current location obtained: $_currentLatLng');
+    if (districtCity.isNotEmpty) {
+      districtCity = districtCity.substring(
+          0, districtCity.length - 2); // Remove last ", "
+      print('Trying district/city: "$districtCity"');
+      return await _geocodeWithNominatim(districtCity);
+    }
 
-      if (_currentLatLng != null && _controller.isCompleted) {
-        GoogleMapController controller = await _controller.future;
-        controller.animateCamera(CameraUpdate.newLatLng(_currentLatLng!));
+    return null;
+  }
+
+  Future<LatLng?> _geocodeWithNominatim(String address) async {
+    try {
+      final encodedAddress = Uri.encodeQueryComponent(address);
+      final url =
+          'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddress&limit=1&countrycodes=VN';
+
+      print('Nominatim URL: $url');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'DeliveryApp/1.0',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('Nominatim response status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('Nominatim response: $data');
+
+        if (data.isNotEmpty) {
+          final lat = double.tryParse(data[0]['lat'].toString());
+          final lon = double.tryParse(data[0]['lon'].toString());
+
+          if (lat != null && lon != null) {
+            return LatLng(lat, lon);
+          }
+        }
       }
     } catch (e) {
-      print('Location error: $e');
-      setState(() {
-        _currentLatLng =
-            const LatLng(10.8411, 106.8066); // Ho Chi Minh City fallback
-        _errorMessage = null;
-      });
-      print('Using fallback location: $_currentLatLng');
+      print('Nominatim geocoding error: $e');
     }
-    print('=== GET LOCATION END ===');
+    return null;
+  }
+
+  // Alternative: Use known district centers as fallback
+  Future<LatLng?> _getDistrictCenter() async {
+    print('Using known district centers...');
+
+    Map<String, LatLng> districtCenters = {
+      'Quận 1': LatLng(10.7769, 106.7009),
+      'Quận 2': LatLng(10.7543, 106.7285),
+      'Quận 3': LatLng(10.7860, 106.6917),
+      'Quận 4': LatLng(10.7572, 106.7025),
+      'Quận 5': LatLng(10.7546, 106.6660),
+      'Quận 6': LatLng(10.7433, 106.6515),
+      'Quận 7': LatLng(10.7332, 106.7199),
+      'Quận 8': LatLng(10.7384, 106.6763),
+      'Quận 9': LatLng(10.8428, 106.8068),
+      'Quận 10': LatLng(10.7736, 106.6710),
+      'Quận 11': LatLng(10.7624, 106.6507),
+      'Quận 12': LatLng(10.8537, 106.6504),
+      'Quận Bình Thạnh': LatLng(10.8014, 106.7100),
+      'Quận Tân Bình': LatLng(10.8009, 106.6525),
+      'Quận Tân Phú': LatLng(10.7904, 106.6279),
+      'Quận Phú Nhuận': LatLng(10.7980, 106.6829),
+      'Quận Gò Vấp': LatLng(10.8376, 106.6667),
+      'Thành phố Thủ Đức': LatLng(10.8709, 106.7633),
+      'Quận Bình Tân': LatLng(10.7392, 106.6055),
+      'Huyện Bình Chánh': LatLng(10.7417, 106.5500),
+      'Huyện Hóc Môn': LatLng(10.8835, 106.5917),
+      'Huyện Củ Chi': LatLng(10.9742, 106.4917),
+    };
+
+    // Find matching district
+    for (String district in districtCenters.keys) {
+      if (receiverAddress.contains(district)) {
+        print('Found district center for: $district');
+        return districtCenters[district];
+      }
+    }
+
+    return null;
+  }
+
+  // Integrated approach - modify your existing _setDestinationCoordinates method
+  Future<void> _setDestinationCoordinatesImproved() async {
+    print('=== SET DESTINATION START (IMPROVED) ===');
+    print('Widget destination: ${widget.destinationLatLng}');
+    print(
+        'Address coordinates: lat=${address?.latitude}, lng=${address?.longitude}');
+
+    // Priority 1: widget parameter
+    if (widget.destinationLatLng != null) {
+      setState(() {
+        _finalDestinationLatLng = widget.destinationLatLng;
+      });
+      print('Using destination from widget parameter');
+    }
+    // Priority 2: address coordinates from API
+    else if (address?.latitude != null && address?.longitude != null) {
+      setState(() {
+        _finalDestinationLatLng =
+            LatLng(address!.latitude!, address!.longitude!);
+      });
+      print('Using coordinates from address object');
+    }
+    // Priority 3: Try multiple geocoding strategies
+    else if (receiverAddress.isNotEmpty &&
+        receiverAddress != "Loading address...") {
+      print('No coordinates available, trying improved geocoding...');
+
+      // Try improved geocoding
+      LatLng? geocodedCoords = await _tryMultipleGeocodingServices();
+
+      if (geocodedCoords != null) {
+        setState(() {
+          _finalDestinationLatLng = geocodedCoords;
+        });
+        print('Successfully geocoded address');
+      } else {
+        // Final fallback: Try district centers
+        LatLng? districtCoords = await _getDistrictCenter();
+        if (districtCoords != null) {
+          setState(() {
+            _finalDestinationLatLng = districtCoords;
+          });
+          print('Using district center coordinates');
+          _showErrorSnackBar('Sử dụng tọa độ trung tâm quận/huyện');
+        } else {
+          print('All geocoding methods failed');
+          _showErrorSnackBar('Không thể xác định địa chỉ chính xác');
+          return;
+        }
+      }
+    }
+    // No address data
+    else {
+      print('No address data available for geocoding');
+      _showErrorSnackBar('Không có thông tin địa chỉ');
+      return;
+    }
+
+    print('Final destination set to: $_finalDestinationLatLng');
+    await Future.delayed(Duration(milliseconds: 500));
+
+    if (_currentLatLng != null && _finalDestinationLatLng != null) {
+      print('Both coordinates available, drawing route...');
+      await _drawRouteWithOSRM();
+    }
+
+    print('=== SET DESTINATION END (IMPROVED) ===');
   }
 
   Future<void> _drawRouteWithOSRM() async {

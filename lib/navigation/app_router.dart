@@ -150,10 +150,55 @@ Map<String, WidgetBuilder> getAppRoutes() {
         child: CartScreen(),
       );
     },
-    Routes.checkout: (context) => CheckoutScreen(
-          totalAmount:
-              ModalRoute.of(context)!.settings.arguments as double? ?? 0.0,
-        ),
+    Routes.checkout: (context) {
+      final args =
+          ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+      double extractedTotal = 0.0;
+
+      if (args != null && args['totalAmount'] != null) {
+        final total = args['totalAmount'];
+        if (total is num && total.isFinite && !total.isNaN) {
+          extractedTotal = total.toDouble();
+        } else if (total is String) {
+          extractedTotal = double.tryParse(total) ?? 0.0;
+        } else if (total is Map<String, dynamic>) {
+          // Handle nested total, e.g., {'value': 100000, 'currency': 'VND'}
+          final nestedKeys = ['value', 'amount', 'totalAmount', 'finalAmount'];
+          for (String key in nestedKeys) {
+            final nestedValue = total[key];
+            if (nestedValue is num &&
+                nestedValue.isFinite &&
+                !nestedValue.isNaN) {
+              extractedTotal = nestedValue.toDouble();
+              break;
+            } else if (nestedValue is String) {
+              final parsed = double.tryParse(nestedValue);
+              if (parsed != null && parsed.isFinite && !parsed.isNaN) {
+                extractedTotal = parsed;
+                break;
+              }
+            }
+          }
+          if (extractedTotal == 0.0) {
+            developer.log('Warning: Could not parse nested totalAmount: $total',
+                name: 'Router');
+          }
+        } else {
+          developer.log(
+              'Warning: Invalid totalAmount type: ${total.runtimeType}',
+              name: 'Router');
+        }
+      } else {
+        developer.log('Warning: No totalAmount in args, defaulting to 0',
+            name: 'Router');
+      }
+
+      return CheckoutScreen(
+        totalAmount: extractedTotal,
+        orderData:
+            args != null ? args['orderData'] as Map<String, dynamic>? : null,
+      );
+    },
     Routes.notification: (context) => NotificationScreen(
           userId: ModalRoute.of(context)!.settings.arguments as String,
         ),

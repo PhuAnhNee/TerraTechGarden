@@ -77,6 +77,17 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     return dio;
   }
 
+  bool _isValidUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    try {
+      final uri = Uri.parse(url);
+      return uri.hasScheme &&
+          uri.hasAuthority; // Ensures scheme (http/https) and host are present
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Fetch Cart method giữ nguyên
   Future<void> _onFetchCart(FetchCart event, Emitter<CartState> emit) async {
     developer.log('Starting to fetch cart...', name: 'CartBloc');
@@ -116,6 +127,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         int calculatedTotalQuantity = 0;
         double saved = 0.0;
 
+        // Default placeholder image URL
+        const String defaultImageUrl =
+            'https://via.placeholder.com/150'; // Replace with your own placeholder image
+
         // Process bundle items
         for (int bundleIndex = 0;
             bundleIndex < bundleItems.length;
@@ -143,7 +158,17 @@ class CartBloc extends Bloc<CartEvent, CartState> {
             final quantity = _safeToInt(itemData['quantity']);
             final price = _safeToDouble(itemData['price']);
             final totalPrice = _safeToDouble(itemData['totalPrice']);
-            final imageUrl = itemData['imageUrl'] ?? '';
+            final imageUrl = itemData['imageUrl']?.toString() ?? '';
+
+            // Validate imageUrl and use default if invalid
+            final validImageUrl =
+                _isValidUrl(imageUrl) ? imageUrl : defaultImageUrl;
+
+            if (imageUrl.isEmpty || !_isValidUrl(imageUrl)) {
+              developer.log(
+                  'Invalid or missing imageUrl for bundle item $accessoryName (cartItemId: $cartItemId): "$imageUrl". Using default: $defaultImageUrl',
+                  name: 'CartBloc');
+            }
 
             items.add({
               'id': cartItemId ?? '$bundleIndex-$accIndex',
@@ -153,7 +178,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
               'accessoryQuantity': quantity,
               'price': price,
               'originalPrice': price,
-              'imageUrl': imageUrl,
+              'imageUrl': validImageUrl, // Use validated URL
               'totalPrice': totalPrice,
               'description': '',
             });
@@ -186,7 +211,17 @@ class CartBloc extends Bloc<CartEvent, CartState> {
           final quantity = _safeToInt(itemData['quantity']);
           final price = _safeToDouble(itemData['price']);
           final totalPrice = _safeToDouble(itemData['totalPrice']);
-          final imageUrl = itemData['imageUrl'] ?? '';
+          final imageUrl = itemData['imageUrl']?.toString() ?? '';
+
+          // Validate imageUrl and use default if invalid
+          final validImageUrl =
+              _isValidUrl(imageUrl) ? imageUrl : defaultImageUrl;
+
+          if (imageUrl.isEmpty || !_isValidUrl(imageUrl)) {
+            developer.log(
+                'Invalid or missing imageUrl for single item $accessoryName (cartItemId: $cartItemId): "$imageUrl". Using default: $defaultImageUrl',
+                name: 'CartBloc');
+          }
 
           items.add({
             'id': cartItemId ?? 'single-$singleIndex',
@@ -196,7 +231,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
             'accessoryQuantity': quantity,
             'price': price,
             'originalPrice': price,
-            'imageUrl': imageUrl,
+            'imageUrl': validImageUrl, // Use validated URL
             'totalPrice': totalPrice,
             'description': '',
           });

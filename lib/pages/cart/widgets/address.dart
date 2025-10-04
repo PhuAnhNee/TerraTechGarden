@@ -1,593 +1,145 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'dart:developer' as developer;
-import 'dart:convert';
 
 class Address {
-  final int? addressId;
+  final int id;
   final String? tagName;
+  final int userId;
   final String receiverName;
   final String receiverPhone;
   final String receiverAddress;
-  final String? provinceCode;
-  final String? districtCode;
-  final String? wardCode;
-  final String? latitude;
-  final String? longitude;
+  final String provinceCode;
+  final String districtCode;
+  final String wardCode;
+  final String latitude;
+  final String longitude;
   final bool isDefault;
 
   Address({
-    this.addressId,
+    required this.id,
     this.tagName,
+    required this.userId,
     required this.receiverName,
     required this.receiverPhone,
     required this.receiverAddress,
-    this.provinceCode,
-    this.districtCode,
-    this.wardCode,
-    this.latitude,
-    this.longitude,
-    this.isDefault = false,
+    required this.provinceCode,
+    required this.districtCode,
+    required this.wardCode,
+    required this.latitude,
+    required this.longitude,
+    required this.isDefault,
   });
 
   factory Address.fromJson(Map<String, dynamic> json) {
     return Address(
-      addressId: json['id'] ?? json['addressId'],
+      id: json['id'] ?? 0,
       tagName: json['tagName'],
+      userId: json['userId'] ?? 0,
       receiverName: json['receiverName'] ?? '',
       receiverPhone: json['receiverPhone'] ?? '',
       receiverAddress: json['receiverAddress'] ?? '',
-      provinceCode: json['provinceCode'],
-      districtCode: json['districtCode'],
-      wardCode: json['wardCode'],
-      latitude: json['latitude']?.toString(),
-      longitude: json['longitude']?.toString(),
+      provinceCode: json['provinceCode'] ?? '',
+      districtCode: json['districtCode'] ?? '',
+      wardCode: json['wardCode'] ?? '',
+      latitude: json['latitude'] ?? '',
+      longitude: json['longitude'] ?? '',
       isDefault: json['isDefault'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'tagName': tagName ?? 'Default',
+      'id': id,
+      'tagName': tagName,
+      'userId': userId,
       'receiverName': receiverName,
       'receiverPhone': receiverPhone,
       'receiverAddress': receiverAddress,
-      'provinceCode': provinceCode ?? '',
-      'districtCode': districtCode ?? '',
-      'wardCode': wardCode ?? '',
-      'latitude': latitude ?? '',
-      'longitude': longitude ?? '',
+      'provinceCode': provinceCode,
+      'districtCode': districtCode,
+      'wardCode': wardCode,
+      'latitude': latitude,
+      'longitude': longitude,
       'isDefault': isDefault,
     };
-  }
-
-  @override
-  String toString() {
-    return '$receiverName\n$receiverPhone\n$receiverAddress';
   }
 }
 
 class AddressService {
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
-  static const String baseUrl = 'https://terarium.shop';
-
-  static Future<String?> _getUserIdFromToken() async {
-    try {
-      final token = await _storage.read(key: 'auth_token');
-      if (token == null || token.isEmpty) {
-        developer.log('❌ No token found', name: 'AddressService');
-        return null;
-      }
-
-      final parts = token.split('.');
-      if (parts.length != 3) {
-        developer.log('❌ Invalid JWT token format', name: 'AddressService');
-        return null;
-      }
-
-      final payload = parts[1];
-      String normalizedPayload = payload;
-      switch (payload.length % 4) {
-        case 1:
-          normalizedPayload += '===';
-          break;
-        case 2:
-          normalizedPayload += '==';
-          break;
-        case 3:
-          normalizedPayload += '=';
-          break;
-      }
-
-      final decoded = utf8.decode(base64Url.decode(normalizedPayload));
-      final Map<String, dynamic> payloadMap = json.decode(decoded);
-
-      final userId = payloadMap['sub']?.toString();
-      developer.log('✅ Extracted userId from JWT: $userId',
-          name: 'AddressService');
-
-      return userId;
-    } catch (e) {
-      developer.log('💥 Error extracting userId from JWT: $e',
-          name: 'AddressService');
-      return null;
-    }
-  }
-
-  static Future<Dio> _getDio() async {
-    final dio = Dio();
-    final token = await _storage.read(key: 'auth_token');
-
-    if (token != null && token.isNotEmpty) {
-      dio.options.headers['Authorization'] = 'Bearer $token';
-      developer.log('✅ Authorization header set for address API',
-          name: 'AddressService');
-    } else {
-      developer.log('⚠️ No token found for address API',
-          name: 'AddressService');
-    }
-
-    dio.options.headers['Content-Type'] = 'application/json';
-    dio.options.headers['Accept'] = '*/*';
-    dio.options.connectTimeout = const Duration(seconds: 30);
-    dio.options.receiveTimeout = const Duration(seconds: 30);
-
-    dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        developer.log('🚀 ADDRESS REQUEST: ${options.method} ${options.path}',
-            name: 'AddressService');
-        developer.log('📋 REQUEST DATA: ${options.data}',
-            name: 'AddressService');
-        handler.next(options);
-      },
-      onResponse: (response, handler) {
-        developer.log('✅ ADDRESS RESPONSE: ${response.statusCode}',
-            name: 'AddressService');
-        developer.log('📋 RESPONSE DATA: ${response.data}',
-            name: 'AddressService');
-        handler.next(response);
-      },
-      onError: (error, handler) {
-        developer.log(
-            '❌ ADDRESS ERROR: ${error.response?.statusCode} ${error.message}',
-            name: 'AddressService');
-        developer.log('📋 ERROR DATA: ${error.response?.data}',
-            name: 'AddressService');
-        handler.next(error);
-      },
-    ));
-
-    return dio;
-  }
-
-  static Future<Map<String, dynamic>> addAddress(Address address) async {
-    try {
-      final dio = await _getDio();
-      final response = await dio.post(
-        '$baseUrl/api/Address/add-address',
-        data: address.toJson(),
-      );
-
-      developer.log('📋 Add address response: ${response.data}',
-          name: 'AddressService');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = response.data;
-
-        if (responseData is Map<String, dynamic>) {
-          final status = responseData['status'];
-          final message = responseData['message'];
-
-          if (status == 200 || status == 201) {
-            developer.log('✅ Address added successfully',
-                name: 'AddressService');
-            return {
-              'success': true,
-              'message': message ?? 'Address added successfully',
-              'data': responseData['data']
-            };
-          } else {
-            developer.log('❌ API returned error status: $status',
-                name: 'AddressService');
-            return {
-              'success': false,
-              'message': message ?? 'Failed to add address'
-            };
-          }
-        }
-      }
-
-      return {
-        'success': false,
-        'message': 'Failed to add address: ${response.statusCode}'
-      };
-    } catch (e) {
-      developer.log('💥 Error adding address: $e', name: 'AddressService');
-
-      if (e is DioException) {
-        String errorMessage = 'Network error occurred';
-
-        if (e.response?.statusCode == 401) {
-          errorMessage = 'Authentication failed. Please log in again.';
-        } else if (e.response?.data != null &&
-            e.response!.data is Map<String, dynamic>) {
-          errorMessage = e.response!.data['message'] ?? errorMessage;
-        } else if (e.message != null) {
-          errorMessage = e.message!;
-        }
-
-        return {'success': false, 'message': errorMessage};
-      }
-
-      return {'success': false, 'message': 'Failed to add address: $e'};
-    }
-  }
-
   static Future<List<Address>> getAddresses() async {
-    try {
-      final userId = await _getUserIdFromToken();
-      if (userId == null) {
-        developer.log('❌ Cannot get addresses: No user ID found',
-            name: 'AddressService');
-        return [];
+    // Simulate API call delay
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Hardcoded address data
+    final List<Map<String, dynamic>> addressData = [
+      {
+        "id": 7,
+        "tagName": "Nhà",
+        "userId": 15,
+        "receiverName": "Hải",
+        "receiverPhone": "0856686130",
+        "receiverAddress":
+            "20D, Phường Long Thạnh Mỹ, Thành phố Thủ Đức, Thành phố Hồ Chí Minh",
+        "provinceCode": "79",
+        "districtCode": "769",
+        "wardCode": "26833",
+        "latitude": "",
+        "longitude": "",
+        "isDefault": true
+      },
+      {
+        "id": 14,
+        "tagName": "công ti",
+        "userId": 15,
+        "receiverName": "phuc",
+        "receiverPhone": "0912384384",
+        "receiverAddress":
+            "số nhà 3923, Phường Phúc Tân, Quận Hoàn Kiếm, Thành phố Hà Nội",
+        "provinceCode": "01",
+        "districtCode": "002",
+        "wardCode": "00037",
+        "latitude": "",
+        "longitude": "",
+        "isDefault": false
+      },
+      {
+        "id": 22,
+        "tagName": "a",
+        "userId": 15,
+        "receiverName": "a",
+        "receiverPhone": "a",
+        "receiverAddress":
+            "a, Phường Quang Trung, Thành phố Hà Giang, Tỉnh Hà Giang",
+        "provinceCode": "02",
+        "districtCode": "024",
+        "wardCode": "00688",
+        "latitude": "",
+        "longitude": "",
+        "isDefault": false
       }
+    ];
 
-      final dio = await _getDio();
-      final response = await dio.get(
-        '$baseUrl/api/Address/getall-by-user-id/$userId',
-      );
-
-      developer.log('📋 Get addresses response status: ${response.statusCode}',
-          name: 'AddressService');
-      developer.log('📋 Get addresses response data: ${response.data}',
-          name: 'AddressService');
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-
-        List<dynamic> addressList = [];
-
-        if (data is Map<String, dynamic>) {
-          if (data.containsKey('status') && data['status'] == 200) {
-            addressList = data['data'] as List<dynamic>? ?? [];
-          } else if (data.containsKey('data')) {
-            addressList = data['data'] as List<dynamic>? ?? [];
-          } else if (data.containsKey('addresses')) {
-            addressList = data['addresses'] as List<dynamic>? ?? [];
-          }
-        } else if (data is List<dynamic>) {
-          addressList = data;
-        }
-
-        developer.log('📋 Processing ${addressList.length} addresses',
-            name: 'AddressService');
-
-        return addressList
-            .map((json) {
-              try {
-                return Address.fromJson(json as Map<String, dynamic>);
-              } catch (e) {
-                developer.log('❌ Error parsing address: $e',
-                    name: 'AddressService');
-                return null;
-              }
-            })
-            .whereType<Address>()
-            .toList();
-      } else {
-        developer.log('❌ Failed to get addresses: ${response.statusCode}',
-            name: 'AddressService');
-      }
-    } catch (e) {
-      developer.log('💥 Error fetching addresses: $e', name: 'AddressService');
-      if (e is DioException) {
-        developer.log('💥 Dio error details: ${e.response?.data}',
-            name: 'AddressService');
-      }
-    }
-    return [];
-  }
-}
-
-class AddAddressDialog extends StatefulWidget {
-  final Function(Address) onAddressAdded;
-
-  const AddAddressDialog({super.key, required this.onAddressAdded});
-
-  @override
-  State<AddAddressDialog> createState() => _AddAddressDialogState();
-}
-
-class _AddAddressDialogState extends State<AddAddressDialog> {
-  final TextEditingController _tagController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false;
-  bool _isDefault = false;
-
-  @override
-  void dispose() {
-    _tagController.dispose();
-    _nameController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    super.dispose();
+    return addressData.map((json) => Address.fromJson(json)).toList();
   }
 
-  Future<void> _addAddress() async {
-    if (!_formKey.currentState!.validate()) return;
+  static Future<Address> addAddress(Address address) async {
+    // Simulate API call delay
+    await Future.delayed(const Duration(milliseconds: 300));
 
-    setState(() => _isLoading = true);
-
-    final address = Address(
-      tagName: _tagController.text.trim().isNotEmpty
-          ? _tagController.text.trim()
-          : 'Default',
-      receiverName: _nameController.text.trim(),
-      receiverPhone: _phoneController.text.trim(),
-      receiverAddress: _addressController.text.trim(),
-      isDefault: _isDefault,
-    );
-
-    final result = await AddressService.addAddress(address);
-
-    setState(() => _isLoading = false);
-
-    if (result['success'] == true) {
-      // Create address object with returned data if available
-      Address createdAddress = address;
-      if (result['data'] != null && result['data'] is Map<String, dynamic>) {
-        createdAddress = Address.fromJson(result['data']);
-      }
-
-      widget.onAddressAdded(createdAddress);
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Thêm địa chỉ thành công!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              result['message'] ?? 'Không thể thêm địa chỉ. Vui lòng thử lại!'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 600),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-        ),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1D7020),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.add_location,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Thêm địa chỉ mới',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1D7020),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Tag Name (Optional)
-                TextFormField(
-                  controller: _tagController,
-                  decoration: InputDecoration(
-                    labelText: 'Tên địa chỉ (tùy chọn)',
-                    hintText: 'VD: Nhà riêng, Văn phòng...',
-                    prefixIcon:
-                        const Icon(Icons.label, color: Color(0xFF1D7020)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF1D7020), width: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Receiver Name
-                TextFormField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Tên người nhận *',
-                    hintText: 'Nhập tên người nhận',
-                    prefixIcon:
-                        const Icon(Icons.person, color: Color(0xFF1D7020)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF1D7020), width: 2),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập tên người nhận';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Receiver Phone
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'Số điện thoại *',
-                    hintText: 'Nhập số điện thoại',
-                    prefixIcon:
-                        const Icon(Icons.phone, color: Color(0xFF1D7020)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF1D7020), width: 2),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập số điện thoại';
-                    }
-                    if (!RegExp(r'^[0-9+\-\s]+$').hasMatch(value.trim())) {
-                      return 'Số điện thoại không hợp lệ';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Receiver Address
-                TextFormField(
-                  controller: _addressController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Địa chỉ *',
-                    hintText:
-                        'Nhập địa chỉ đầy đủ (số nhà, đường, phường/xã, quận/huyện, tỉnh/thành)',
-                    prefixIcon:
-                        const Icon(Icons.location_on, color: Color(0xFF1D7020)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF1D7020), width: 2),
-                    ),
-                    alignLabelWithHint: true,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập địa chỉ';
-                    }
-                    if (value.trim().length < 10) {
-                      return 'Địa chỉ quá ngắn, vui lòng nhập đầy đủ';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Is Default checkbox
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _isDefault,
-                      onChanged: (value) {
-                        setState(() {
-                          _isDefault = value ?? false;
-                        });
-                      },
-                      activeColor: const Color(0xFF1D7020),
-                    ),
-                    const Text('Đặt làm địa chỉ mặc định'),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: Colors.grey),
-                          ),
-                        ),
-                        child: const Text(
-                          'Hủy',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _addAddress,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1D7020),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Thêm địa chỉ',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    // In a real app, this would make an API call to add the address
+    // For now, just return the address with a new ID
+    return Address(
+      id: DateTime.now().millisecondsSinceEpoch, // Generate fake ID
+      tagName: address.tagName,
+      userId: address.userId,
+      receiverName: address.receiverName,
+      receiverPhone: address.receiverPhone,
+      receiverAddress: address.receiverAddress,
+      provinceCode: address.provinceCode,
+      districtCode: address.districtCode,
+      wardCode: address.wardCode,
+      latitude: address.latitude,
+      longitude: address.longitude,
+      isDefault: address.isDefault,
     );
   }
 }
@@ -611,268 +163,458 @@ class AddressSelectionDialog extends StatefulWidget {
 }
 
 class _AddressSelectionDialogState extends State<AddressSelectionDialog> {
-  late List<Address> _addresses;
-  Address? _selectedAddress;
+  Address? _tempSelectedAddress;
+  bool _isAddingNewAddress = false;
 
   @override
   void initState() {
     super.initState();
-    _addresses = List.from(widget.addresses);
-    _selectedAddress = widget.selectedAddress;
+    _tempSelectedAddress = widget.selectedAddress;
   }
 
   void _showAddAddressDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AddAddressDialog(
+    setState(() {
+      _isAddingNewAddress = true;
+    });
+  }
+
+  void _hideAddAddressDialog() {
+    setState(() {
+      _isAddingNewAddress = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isAddingNewAddress) {
+      return AddAddressDialog(
+        onCancel: _hideAddAddressDialog,
         onAddressAdded: (address) {
-          setState(() {
-            _addresses.add(address);
-          });
           widget.onAddressAdded(address);
+          _hideAddAddressDialog();
+          Navigator.of(context).pop();
         },
+      );
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 600),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Chọn địa chỉ giao hàng',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const Divider(),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.addresses.length,
+                itemBuilder: (context, index) {
+                  final address = widget.addresses[index];
+                  final isSelected = _tempSelectedAddress?.id == address.id;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _tempSelectedAddress = address;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFF1D7020)
+                                : Colors.grey.shade300,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          color: isSelected
+                              ? const Color(0xFF1D7020).withOpacity(0.05)
+                              : Colors.white,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Radio<Address>(
+                                  value: address,
+                                  groupValue: _tempSelectedAddress,
+                                  onChanged: (Address? value) {
+                                    setState(() {
+                                      _tempSelectedAddress = value;
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF1D7020),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            address.receiverName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          if (address.tagName != null &&
+                                              address.tagName!.isNotEmpty) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1D7020)
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                address.tagName!,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF1D7020),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                          if (address.isDefault) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Text(
+                                                'Mặc định',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.orange,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        address.receiverPhone,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        address.receiverAddress,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 14,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: _showAddAddressDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Thêm địa chỉ mới'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1D7020),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Hủy'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _tempSelectedAddress != null
+                        ? () {
+                            widget.onAddressSelected(_tempSelectedAddress!);
+                            Navigator.of(context).pop();
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1D7020),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Xác nhận'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
+  }
+}
+
+class AddAddressDialog extends StatefulWidget {
+  final VoidCallback onCancel;
+  final Function(Address) onAddressAdded;
+
+  const AddAddressDialog({
+    super.key,
+    required this.onCancel,
+    required this.onAddressAdded,
+  });
+
+  @override
+  State<AddAddressDialog> createState() => _AddAddressDialogState();
+}
+
+class _AddAddressDialogState extends State<AddAddressDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _tagController = TextEditingController();
+  bool _isDefault = false;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _tagController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addAddress() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final newAddress = Address(
+        id: 0, // Will be assigned by service
+        tagName: _tagController.text.trim().isEmpty
+            ? null
+            : _tagController.text.trim(),
+        userId: 15, // Hardcoded user ID
+        receiverName: _nameController.text.trim(),
+        receiverPhone: _phoneController.text.trim(),
+        receiverAddress: _addressController.text.trim(),
+        provinceCode: "79", // Default province code
+        districtCode: "769", // Default district code
+        wardCode: "26833", // Default ward code
+        latitude: "",
+        longitude: "",
+        isDefault: _isDefault,
+      );
+
+      final addedAddress = await AddressService.addAddress(newAddress);
+      widget.onAddressAdded(addedAddress);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể thêm địa chỉ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Container(
         constraints: const BoxConstraints(maxHeight: 600),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1D7020),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Chọn địa chỉ giao hàng',
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Thêm địa chỉ mới',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1D7020),
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: _showAddAddressDialog,
-                  icon: const Icon(
-                    Icons.add_circle,
-                    color: Color(0xFF1D7020),
-                    size: 28,
+                  IconButton(
+                    onPressed: widget.onCancel,
+                    icon: const Icon(Icons.close),
                   ),
-                  tooltip: 'Thêm địa chỉ mới',
+                ],
+              ),
+              const Divider(),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Tên người nhận *',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Vui lòng nhập tên người nhận';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Số điện thoại *',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Vui lòng nhập số điện thoại';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Địa chỉ chi tiết *',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 3,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Vui lòng nhập địa chỉ';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _tagController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nhãn địa chỉ (VD: Nhà, Công ty)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      CheckboxListTile(
+                        title: const Text('Đặt làm địa chỉ mặc định'),
+                        value: _isDefault,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            _isDefault = value ?? false;
+                          });
+                        },
+                        activeColor: const Color(0xFF1D7020),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Flexible(
-              child: _addresses.isEmpty
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.location_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Chưa có địa chỉ nào',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _showAddAddressDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Thêm địa chỉ đầu tiên'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D7020),
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _addresses.length,
-                      itemBuilder: (context, index) {
-                        final address = _addresses[index];
-                        final isSelected =
-                            _selectedAddress?.addressId == address.addressId;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF1D7020)
-                                  : Colors.grey.shade300,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            color: isSelected
-                                ? const Color(0xFF1D7020).withOpacity(0.05)
-                                : Colors.white,
-                          ),
-                          child: RadioListTile<Address>(
-                            value: address,
-                            groupValue: _selectedAddress,
-                            activeColor: const Color(0xFF1D7020),
-                            onChanged: (Address? value) {
-                              setState(() {
-                                _selectedAddress = value;
-                              });
-                            },
-                            title: Row(
-                              children: [
-                                Text(
-                                  address.receiverName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                if (address.tagName != null &&
-                                    address.tagName!.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1D7020)
-                                          .withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      address.tagName!,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF1D7020),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                if (address.isDefault) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'Mặc định',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Text(
-                                  address.receiverPhone,
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  address.receiverAddress,
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            contentPadding: const EdgeInsets.all(16),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            if (_addresses.isNotEmpty) ...[
-              const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Colors.grey),
-                        ),
-                      ),
-                      child: const Text(
-                        'Hủy',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
+                      onPressed: _isLoading ? null : widget.onCancel,
+                      child: const Text('Hủy'),
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _selectedAddress == null
-                          ? null
-                          : () {
-                              widget.onAddressSelected(_selectedAddress!);
-                              Navigator.of(context).pop();
-                            },
+                      onPressed: _isLoading ? null : _addAddress,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1D7020),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
-                      child: const Text(
-                        'Chọn địa chỉ',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('Thêm'),
                     ),
                   ),
                 ],
               ),
             ],
-          ],
+          ),
         ),
       ),
     );

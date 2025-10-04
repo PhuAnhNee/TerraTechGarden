@@ -298,7 +298,7 @@ class TerraApi {
   static String payOsCallback() => _baseUrl('Payment/pay-os/callback');
   static String vnPayPayment() => _baseUrl('Payment/vn-pay');
   static String vnPayCallback() => _baseUrl('Payment/vn-pay/callback');
-  static String momoCreatePayment() => _baseUrl('Payment/momo/create');
+  static String createMomoPayment() => _baseUrl('Payment/momo/create');
   static String momoCallback() => _baseUrl('Payment/momo/callback');
   static String momoIpn() => _baseUrl('Payment/momo/ipn');
 

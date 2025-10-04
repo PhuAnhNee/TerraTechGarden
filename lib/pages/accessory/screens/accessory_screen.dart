@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/accessory_bloc.dart';
 import '../bloc/accessory_event.dart';
 import '../bloc/accessory_state.dart';
-import '../../../components/accessory_cart.dart';
 import 'dart:developer' as developer;
 
 class AccessoryScreen extends StatefulWidget {
@@ -15,7 +14,6 @@ class AccessoryScreen extends StatefulWidget {
 
 class _AccessoryScreenState extends State<AccessoryScreen>
     with AutomaticKeepAliveClientMixin {
-  int currentPage = 1;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
@@ -27,7 +25,7 @@ class _AccessoryScreenState extends State<AccessoryScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AccessoryBloc>().add(FetchAccessories(page: currentPage));
+      context.read<AccessoryBloc>().add(const FetchAccessories(page: 1));
     });
   }
 
@@ -39,90 +37,67 @@ class _AccessoryScreenState extends State<AccessoryScreen>
 
   Future<void> _onRefresh() async {
     context.read<AccessoryBloc>().add(const RefreshAccessories());
-    setState(() {
-      currentPage = 1;
-    });
-  }
-
-  void _changePage(int newPage) {
-    if (newPage != currentPage && newPage > 0) {
-      setState(() {
-        currentPage = newPage;
-      });
-      context.read<AccessoryBloc>().add(FetchAccessories(page: newPage));
-      _scrollToTop();
-    }
-  }
-
-  void _scrollToTop() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
   }
 
   Widget _buildLoadingShimmer() {
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.8, // Tăng tỷ lệ vì bỏ nút thêm vào giỏ
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
-      itemCount: 6, // Số lượng shimmer items
+      itemCount: 6,
       itemBuilder: (context, index) {
         return Card(
           elevation: 2,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           child: Column(
             children: [
               Expanded(
-                flex: 3,
+                flex: 2,
                 child: Container(
-                  width: double.infinity,
+                  height: 120,
                   decoration: const BoxDecoration(
                     borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(12)),
+                        BorderRadius.vertical(top: Radius.circular(10)),
                     color: Color(0xFFE0E0E0),
                   ),
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 1,
                 child: Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.all(6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        height: 16,
+                        height: 20,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: const Color(0xFFE0E0E0),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Container(
-                        height: 14,
-                        width: 100,
+                        height: 12,
+                        width: 60,
                         decoration: BoxDecoration(
                           color: const Color(0xFFE0E0E0),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 4),
                       Container(
-                        height: 32,
-                        width: double.infinity,
+                        height: 10,
+                        width: 40,
                         decoration: BoxDecoration(
                           color: const Color(0xFFE0E0E0),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ],
@@ -136,173 +111,6 @@ class _AccessoryScreenState extends State<AccessoryScreen>
     );
   }
 
-  Widget _buildPaginationButton(int page, {bool isActive = false}) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      child: Material(
-        elevation: isActive ? 4 : 1,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: isActive ? null : () => _changePage(page),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: isActive ? const Color(0xFF1D7020) : Colors.white,
-              border: Border.all(
-                color:
-                    isActive ? const Color(0xFF1D7020) : Colors.grey.shade300,
-                width: 1,
-              ),
-            ),
-            child: Text(
-              '$page',
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.grey.shade700,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaginationControls(int totalPages, bool isLoading) {
-    if (totalPages <= 1) return const SizedBox();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Column(
-        children: [
-          if (isLoading)
-            const LinearProgressIndicator(
-              backgroundColor: Colors.grey,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1D7020)),
-            ),
-          const SizedBox(height: 8),
-          _buildPaginationRow(totalPages),
-          const SizedBox(height: 8),
-          Text(
-            'Trang $currentPage / $totalPages',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaginationRow(int totalPages) {
-    List<Widget> paginationItems = [];
-
-    // Previous button
-    paginationItems.add(_buildNavButton(
-      icon: Icons.chevron_left,
-      onTap: currentPage > 1 ? () => _changePage(currentPage - 1) : null,
-      enabled: currentPage > 1,
-    ));
-
-    // Page numbers logic
-    int startPage = 1;
-    int endPage = totalPages;
-
-    if (totalPages > 5) {
-      if (currentPage <= 3) {
-        endPage = 5;
-      } else if (currentPage >= totalPages - 2) {
-        startPage = totalPages - 4;
-      } else {
-        startPage = currentPage - 2;
-        endPage = currentPage + 2;
-      }
-    }
-
-    if (startPage > 1) {
-      paginationItems.add(_buildPaginationButton(1));
-      if (startPage > 2) {
-        paginationItems.add(_buildEllipsis());
-      }
-    }
-
-    for (int i = startPage; i <= endPage; i++) {
-      paginationItems
-          .add(_buildPaginationButton(i, isActive: i == currentPage));
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        paginationItems.add(_buildEllipsis());
-      }
-      paginationItems.add(_buildPaginationButton(totalPages));
-    }
-
-    // Next button
-    paginationItems.add(_buildNavButton(
-      icon: Icons.chevron_right,
-      onTap:
-          currentPage < totalPages ? () => _changePage(currentPage + 1) : null,
-      enabled: currentPage < totalPages,
-    ));
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: paginationItems,
-      ),
-    );
-  }
-
-  Widget _buildNavButton({
-    required IconData icon,
-    required VoidCallback? onTap,
-    required bool enabled,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      child: Material(
-        elevation: 1,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Icon(
-              icon,
-              color: enabled ? const Color(0xFF1D7020) : Colors.grey,
-              size: 20,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEllipsis() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('...', style: TextStyle(color: Colors.grey)),
-    );
-  }
-
   Widget _buildAccessoryCard(Map<String, dynamic> accessory) {
     final images =
         accessory['accessoryImages'] as List<Map<String, dynamic>>? ?? [];
@@ -312,74 +120,110 @@ class _AccessoryScreenState extends State<AccessoryScreen>
         : 'https://via.placeholder.com/300x300?text=No+Image';
 
     final name = accessory['accessoryName'] ?? 'Chưa có tên';
-    final price = accessory['price'] ?? 'Liên hệ';
+    final price = accessory['price']?.toString() ?? 'Liên hệ';
     final stock = accessory['stock'] ?? 0;
+    final size = accessory['size']?.toString() ?? '';
+    final quantitative = accessory['quantitative']?.toString() ?? '';
+    final purchaseCount = accessory['purchaseCount'] ?? 0;
+    final averageRating = accessory['averageRating'] ?? 0;
+
+    // Hiển thị size hoặc quantitative nếu có
+    String additionalInfo = '';
+    if (size.isNotEmpty) {
+      additionalInfo = size;
+    } else if (quantitative.isNotEmpty) {
+      additionalInfo = quantitative;
+    }
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         onTap: () {
           // TODO: Navigate to detail page
+          developer.log('Tapped on: $name (ID: ${accessory['id']})');
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               flex: 3,
-              child: Hero(
-                tag: 'accessory_${accessory['id']}',
-                child: ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.network(
-                    imageUrl,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        color: Colors.grey[100],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                            strokeWidth: 2,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF1D7020),
+              child: Stack(
+                children: [
+                  Hero(
+                    tag: 'accessory_${accessory['id']}',
+                    child: ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(10)),
+                      child: Image.network(
+                        imageUrl,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey[100],
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF1D7020),
+                                ),
+                              ),
                             ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          developer.log('Image load error for $name: $error');
+                          return Container(
+                            color: Colors.grey[100],
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.image_not_supported,
+                                    color: Colors.grey, size: 40),
+                                SizedBox(height: 4),
+                                Text('Không có ảnh',
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Badge hiển thị số lượt mua nếu có
+                  if (purchaseCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Đã bán $purchaseCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      developer.log('Image load error for $name: $error');
-                      return Container(
-                        color: Colors.grey[100],
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.image_not_supported,
-                                color: Colors.grey, size: 40),
-                            SizedBox(height: 4),
-                            Text('Không có ảnh',
-                                style: TextStyle(
-                                    color: Colors.grey, fontSize: 12)),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    ),
+                ],
               ),
             ),
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -387,111 +231,80 @@ class _AccessoryScreenState extends State<AccessoryScreen>
                       name,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                        fontSize: 13,
                         color: Colors.black87,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (additionalInfo.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        additionalInfo,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          price,
-                          style: const TextStyle(
-                            color: Color(0xFF1D7020),
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (stock > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.green.shade200),
-                            ),
-                            child: Text(
-                              'Còn $stock',
-                              style: TextStyle(
-                                color: Colors.green.shade700,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.red.shade200),
-                            ),
-                            child: Text(
-                              'Hết hàng',
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                      ],
+                    Text(
+                      price,
+                      style: const TextStyle(
+                        color: Color(0xFF1D7020),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 32,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: stock > 0
-                              ? const Color(0xFF1D7020)
-                              : Colors.grey.shade400,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: EdgeInsets.zero,
-                          elevation: stock > 0 ? 2 : 0,
-                        ),
-                        onPressed: stock > 0
-                            ? () {
-                                context
-                                    .read<AccessoryBloc>()
-                                    .add(AddToCart(accessory));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đã thêm $name vào giỏ hàng'),
-                                    duration: const Duration(seconds: 2),
-                                    backgroundColor: const Color(0xFF1D7020),
-                                  ),
-                                );
-                              }
-                            : null,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              stock > 0
-                                  ? Icons.shopping_cart_outlined
-                                  : Icons.block,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          ],
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: stock > 0
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: stock > 0
+                                ? Colors.green.shade200
+                                : Colors.red.shade200),
+                      ),
+                      child: Text(
+                        stock > 0 ? 'Còn $stock' : 'Hết hàng',
+                        style: TextStyle(
+                          color: stock > 0
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
+                    // Hiển thị rating nếu có
+                    if (averageRating > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: Colors.amber,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            averageRating.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -512,25 +325,7 @@ class _AccessoryScreenState extends State<AccessoryScreen>
         foregroundColor: Colors.white,
         title: const Text('Phụ Kiện',
             style: TextStyle(fontWeight: FontWeight.w600)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: TextButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AccessoryCart(cartItems: []),
-                  ),
-                );
-              },
-              icon:
-                  const Icon(Icons.shopping_cart_outlined, color: Colors.white),
-              label:
-                  const Text('Giỏ hàng', style: TextStyle(color: Colors.white)),
-            ),
-          ),
-        ],
+        // Đã bỏ phần actions chứa giỏ hàng
       ),
       body: BlocConsumer<AccessoryBloc, AccessoryState>(
         listener: (context, state) {
@@ -545,7 +340,7 @@ class _AccessoryScreenState extends State<AccessoryScreen>
                   onPressed: () {
                     context
                         .read<AccessoryBloc>()
-                        .add(FetchAccessories(page: currentPage));
+                        .add(const FetchAccessories(page: 1));
                   },
                 ),
               ),
@@ -558,33 +353,23 @@ class _AccessoryScreenState extends State<AccessoryScreen>
           }
 
           if (state is AccessoryPageLoading) {
-            // Hiện previous data với loading indicator
-            final previousData = state.previousState;
-            return Column(
-              children: [
-                Expanded(
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.75,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: previousData.accessories.length,
-                    itemBuilder: (context, index) {
-                      return Opacity(
-                        opacity: 0.6,
-                        child: _buildAccessoryCard(
-                            previousData.accessories[index]),
-                      );
-                    },
-                  ),
-                ),
-                _buildPaginationControls(previousData.totalPages, true),
-              ],
+            return GridView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.75, // Đồng bộ tỷ lệ
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: state.previousState.accessories.length,
+              itemBuilder: (context, index) {
+                return Opacity(
+                  opacity: 0.6,
+                  child: _buildAccessoryCard(
+                      state.previousState.accessories[index]),
+                );
+              },
             );
           }
 
@@ -604,21 +389,21 @@ class _AccessoryScreenState extends State<AccessoryScreen>
                           children: [
                             Icon(Icons.inventory_2_outlined,
                                 size: 80, color: Colors.grey.shade400),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             Text(
-                              'Không có phụ kiện nào',
+                              'Không có phụ kiện',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Text(
-                              'Kéo xuống để làm mới',
+                              'Kéo để làm mới',
                               style: TextStyle(
                                 color: Colors.grey.shade500,
-                                fontSize: 14,
+                                fontSize: 12,
                               ),
                             ),
                           ],
@@ -633,27 +418,19 @@ class _AccessoryScreenState extends State<AccessoryScreen>
             return RefreshIndicator(
               key: _refreshIndicatorKey,
               onRefresh: _onRefresh,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: GridView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.75,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
-                      itemCount: accessories.length,
-                      itemBuilder: (context, index) {
-                        return _buildAccessoryCard(accessories[index]);
-                      },
-                    ),
-                  ),
-                  _buildPaginationControls(state.totalPages, false),
-                ],
+              child: GridView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(12),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.8, // Tăng tỷ lệ để card nhỏ gọn hơn
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: accessories.length,
+                itemBuilder: (context, index) {
+                  return _buildAccessoryCard(accessories[index]);
+                },
               ),
             );
           }
@@ -671,16 +448,16 @@ class _AccessoryScreenState extends State<AccessoryScreen>
                         children: [
                           Icon(Icons.error_outline,
                               size: 80, color: Colors.red.shade300),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           Text(
-                            'Có lỗi xảy ra',
+                            'Lỗi',
                             style: TextStyle(
                               color: Colors.red.shade600,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 32),
                             child: Text(
@@ -688,24 +465,24 @@ class _AccessoryScreenState extends State<AccessoryScreen>
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.grey.shade600,
-                                fontSize: 14,
+                                fontSize: 12,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: () {
                               context
                                   .read<AccessoryBloc>()
-                                  .add(FetchAccessories(page: currentPage));
+                                  .add(const FetchAccessories(page: 1));
                             },
-                            icon: const Icon(Icons.refresh),
+                            icon: const Icon(Icons.refresh, size: 20),
                             label: const Text('Thử lại'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF1D7020),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 12),
+                                  horizontal: 20, vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -720,9 +497,7 @@ class _AccessoryScreenState extends State<AccessoryScreen>
             );
           }
 
-          return const Center(
-            child: Text('Trạng thái không xác định'),
-          );
+          return const Center(child: Text('Trạng thái không xác định'));
         },
       ),
     );

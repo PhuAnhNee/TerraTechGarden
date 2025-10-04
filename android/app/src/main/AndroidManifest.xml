@@ -5,14 +5,19 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     
-    <!-- Quyền gọi điện - THÊM DÒNG NÀY -->
+    <!-- Quyền gọi điện -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    
+    <!-- Quyền Internet cho thanh toán MoMo -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:label="terratechgarden"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="true">
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -32,10 +37,28 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"/>
 
+            <!-- Main launcher intent -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            
+            <!-- Handle HTTP URLs - cho MoMo payment -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+            </intent-filter>
+            
+            <!-- Handle HTTPS URLs - cho MoMo payment -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+            </intent-filter>
+
         </activity>
 
         <meta-data
@@ -44,7 +67,7 @@
 
     </application>
 
-    <!-- Queries - CẤU HÌNH ĐẦY ĐỦ CHO PHONE CALLS -->
+    <!-- Queries - CẤU HÌNH ĐẦY ĐỦ -->
     <queries>
         <!-- Query cho DIAL intent -->
         <intent>
@@ -64,10 +87,36 @@
             <data android:scheme="tel" />
         </intent>
         
+        <!-- Query cho HTTP/HTTPS URLs - cho MoMo payment -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
+        
+        <!-- Query cho MoMo app nếu có -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="momo" />
+        </intent>
+        
         <!-- Query cho process text (giữ lại cái cũ) -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        
+        <!-- Query cho browser apps -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="*" />
         </intent>
     </queries>
 </manifest>
